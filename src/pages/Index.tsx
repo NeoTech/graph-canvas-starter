@@ -14,6 +14,7 @@ const Index = () => {
   const [canvasHeight, setCanvasHeight] = useState<number>(600);
   const graphRef = useRef<LGraph | null>(null);
   const runOnceRef = useRef<(() => void) | null>(null);
+  const fitViewRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     // Subscribe to visualization updates
@@ -58,8 +59,14 @@ const Index = () => {
   }, []);
 
   const handleFitView = useCallback(() => {
-    // This would require access to the canvas instance
-    toast.info("Use scroll wheel to zoom, drag to pan");
+    if (fitViewRef.current) {
+      fitViewRef.current();
+      toast.success("View fitted to canvas");
+    }
+  }, []);
+
+  const handleFitViewReady = useCallback((fitViewFn: () => void) => {
+    fitViewRef.current = fitViewFn;
   }, []);
 
   const handleAddNode = useCallback((type: string) => {
@@ -95,6 +102,7 @@ const Index = () => {
                   setCanvasWidth(width);
                   setCanvasHeight(height);
                 }}
+                onFitViewReady={handleFitViewReady}
               />
             </ResizablePanel>
             

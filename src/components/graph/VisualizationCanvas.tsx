@@ -15,9 +15,10 @@ export interface VisualizationData {
 interface VisualizationCanvasProps {
   visualizations: VisualizationData[];
   onSizeChange?: (width: number, height: number) => void;
+  onFitViewReady?: (fitViewFn: () => void) => void;
 }
 
-export const VisualizationCanvas = ({ visualizations, onSizeChange }: VisualizationCanvasProps) => {
+export const VisualizationCanvas = ({ visualizations, onSizeChange, onFitViewReady }: VisualizationCanvasProps) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -101,6 +102,34 @@ export const VisualizationCanvas = ({ visualizations, onSizeChange }: Visualizat
     setScale(1);
     setPan({ x: 0, y: 0 });
   };
+
+  const handleFitView = () => {
+    if (!containerRef.current) return;
+    
+    const containerWidth = containerRef.current.clientWidth;
+    const containerHeight = containerRef.current.clientHeight;
+    
+    // Calculate scale to fit render dimensions into viewport with some padding
+    const padding = 50; // pixels of padding around the content
+    const availableWidth = containerWidth - padding * 2;
+    const availableHeight = containerHeight - padding * 2;
+    
+    const scaleX = availableWidth / renderDimensions.width;
+    const scaleY = availableHeight / renderDimensions.height;
+    
+    // Use the smaller scale to ensure everything fits
+    const newScale = Math.min(scaleX, scaleY, 1); // Don't zoom in beyond 1x
+    
+    setScale(newScale);
+    setPan({ x: 0, y: 0 }); // Reset pan to center
+  };
+
+  // Expose fit view function to parent
+  useEffect(() => {
+    if (onFitViewReady) {
+      onFitViewReady(handleFitView);
+    }
+  }, [onFitViewReady, renderDimensions]);
 
   // Handle pan/drag
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
