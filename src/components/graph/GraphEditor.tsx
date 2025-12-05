@@ -69,10 +69,9 @@ export const GraphEditor = ({ onGraphChange, onGraphReady, canvasWidth, canvasHe
     (graph as any).canvasWidth = canvasWidth || 800;
     (graph as any).canvasHeight = canvasHeight || 600;
     
-    // Disable context menu and search
+    // Disable search box (double-click)
     graphCanvas.allow_searchbox = false;
-    (graphCanvas as any).allow_context_menu = false;
-    
+     
     // Disable multi-selection - override selectNodes to always work with single selection
     const originalSelectNodes = graphCanvas.selectNodes.bind(graphCanvas);
     graphCanvas.selectNodes = function(nodes: any) {

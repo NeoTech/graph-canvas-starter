@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { Maximize2, Minimize2, Plus, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export interface VisualizationData {
@@ -19,6 +19,11 @@ export const VisualizationCanvas = ({ visualizations, onSizeChange }: Visualizat
   const containerRef = useRef<HTMLDivElement>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [viewBox, setViewBox] = useState("0 0 800 400");
+  const [scale, setScale] = useState(1);
+  const baseViewBoxRef = useRef({ width: 800, height: 400 });
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   // Update viewBox based on container size
   useEffect(() => {
@@ -26,8 +31,14 @@ export const VisualizationCanvas = ({ visualizations, onSizeChange }: Visualizat
       if (containerRef.current) {
         const width = containerRef.current.clientWidth;
         const height = containerRef.current.clientHeight;
-        // Use actual pixel dimensions for 1:1 coordinate mapping
-        setViewBox(`0 0 ${width} ${height}`);
+        // Store base dimensions
+        baseViewBoxRef.current = { width, height };
+        // Apply current scale and pan to viewBox
+        const scaledWidth = width / scale;
+        const scaledHeight = height / scale;
+        const offsetX = (width - scaledWidth) / 2 - pan.x / scale;
+        const offsetY = (height - scaledHeight) / 2 - pan.y / scale;
+        setViewBox(`${offsetX} ${offsetY} ${scaledWidth} ${scaledHeight}`);
         // Notify parent of size change
         if (onSizeChange) {
           onSizeChange(width, height);
@@ -57,7 +68,69 @@ export const VisualizationCanvas = ({ visualizations, onSizeChange }: Visualizat
       window.removeEventListener('resize', updateViewBox);
       clearTimeout(timeoutId);
     };
-  }, [isExpanded, onSizeChange]);
+  }, [isExpanded, onSizeChange, scale, pan]);
+
+  // Handle mouse wheel zoom
+  useEffect(() => {
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+        setScale(prev => Math.max(0.1, Math.min(5, prev + delta)));
+      }
+    };
+
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('wheel', handleWheel, { passive: false });
+    }
+
+    return () => {
+      if (container) {
+        container.removeEventListener('wheel', handleWheel);
+      }
+    };
+  }, []);
+
+  const handleZoomIn = () => {
+    setScale(prev => Math.min(5, prev + 0.2));
+  };
+
+  const handleZoomOut = () => {
+    setScale(prev => Math.max(0.1, prev - 0.2));
+  };
+
+  const handleResetZoom = () => {
+    setScale(1);
+    setPan({ x: 0, y: 0 });
+  };
+
+  // Handle pan/drag
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Only start dragging if clicking on the background (not on UI elements)
+    if (e.target === containerRef.current || (e.target as HTMLElement).closest('svg')) {
+      setIsDragging(true);
+      setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+      e.preventDefault();
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isDragging) {
+      setPan({
+        x: e.clientX - dragStart.x,
+        y: e.clientY - dragStart.y,
+      });
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
 
   useEffect(() => {
     if (!svgRef.current) return;
@@ -212,22 +285,63 @@ export const VisualizationCanvas = ({ visualizations, onSizeChange }: Visualizat
           <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
           <span className="text-sm font-medium">SVG Visualization Canvas</span>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={() => setIsExpanded(!isExpanded)}
-        >
-          {isExpanded ? (
-            <Minimize2 className="w-4 h-4" />
-          ) : (
-            <Maximize2 className="w-4 h-4" />
-          )}
-        </Button>
+        <div className="flex items-center gap-1">
+          {/* Zoom controls */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={handleZoomOut}
+            title="Zoom Out"
+          >
+            <Minus className="w-4 h-4" />
+          </Button>
+          <span className="text-xs font-mono text-muted-foreground min-w-[3rem] text-center">
+            {Math.round(scale * 100)}%
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={handleZoomIn}
+            title="Zoom In"
+          >
+            <Plus className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={handleResetZoom}
+            title="Reset Zoom"
+          >
+            Reset
+          </Button>
+          <div className="w-px h-4 bg-border mx-1" />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => setIsExpanded(!isExpanded)}
+          >
+            {isExpanded ? (
+              <Minimize2 className="w-4 h-4" />
+            ) : (
+              <Maximize2 className="w-4 h-4" />
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* SVG Canvas */}
-      <div ref={containerRef} className={`bg-slate-950 relative ${isExpanded ? "h-[calc(100%-40px)]" : "h-[calc(100%-40px)]"}`}>
+      <div 
+        ref={containerRef} 
+        className={`bg-slate-950 relative ${isExpanded ? "h-[calc(100%-40px)]" : "h-[calc(100%-40px)]"} ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
+      >
         <svg
           ref={svgRef}
           viewBox={viewBox}
@@ -263,7 +377,8 @@ export const VisualizationCanvas = ({ visualizations, onSizeChange }: Visualizat
       
       {/* Canvas dimensions indicator */}
       <div className="absolute bottom-2 left-2 px-2 py-1 rounded bg-black/50 text-xs text-muted-foreground font-mono pointer-events-none">
-        {viewBox.split(' ')[2]} × {viewBox.split(' ')[3]} px
+        {baseViewBoxRef.current.width} × {baseViewBoxRef.current.height} px • {Math.round(scale * 100)}% zoom
+        <div className="text-[10px] opacity-60 mt-0.5">Ctrl+Scroll to zoom • Click & drag to pan</div>
       </div>
     </div>
   );
