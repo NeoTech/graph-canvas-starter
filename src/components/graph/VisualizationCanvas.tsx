@@ -7,6 +7,9 @@ export interface VisualizationData {
   data: any;
   timestamp: number;
   id?: string; // Add unique ID for tracking
+  canvasWidth?: number; // Render canvas width from Render Output node
+  canvasHeight?: number; // Render canvas height from Render Output node
+  backgroundColor?: string; // Background color from Render Output node
 }
 
 interface VisualizationCanvasProps {
@@ -18,57 +21,51 @@ export const VisualizationCanvas = ({ visualizations, onSizeChange }: Visualizat
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [viewBox, setViewBox] = useState("0 0 800 400");
+  const [viewBox, setViewBox] = useState("0 0 1920 1080");
   const [scale, setScale] = useState(1);
-  const baseViewBoxRef = useRef({ width: 800, height: 400 });
+  const [renderDimensions, setRenderDimensions] = useState({ width: 1920, height: 1080 });
+  const [backgroundColor, setBackgroundColor] = useState<string>("transparent");
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
-  // Update viewBox based on container size
+  // Extract render dimensions from visualizations
+  useEffect(() => {
+    if (visualizations.length > 0) {
+      const firstViz = visualizations[0];
+      if (firstViz.canvasWidth && firstViz.canvasHeight) {
+        setRenderDimensions({
+          width: firstViz.canvasWidth,
+          height: firstViz.canvasHeight
+        });
+      }
+      if (firstViz.backgroundColor !== undefined) {
+        setBackgroundColor(firstViz.backgroundColor);
+      }
+    }
+  }, [visualizations]);
+
+  // Update viewBox based on render dimensions
   useEffect(() => {
     const updateViewBox = () => {
-      if (containerRef.current) {
-        const width = containerRef.current.clientWidth;
-        const height = containerRef.current.clientHeight;
-        // Store base dimensions
-        baseViewBoxRef.current = { width, height };
-        // Apply current scale and pan to viewBox
-        const scaledWidth = width / scale;
-        const scaledHeight = height / scale;
-        const offsetX = (width - scaledWidth) / 2 - pan.x / scale;
-        const offsetY = (height - scaledHeight) / 2 - pan.y / scale;
-        setViewBox(`${offsetX} ${offsetY} ${scaledWidth} ${scaledHeight}`);
-        // Notify parent of size change
-        if (onSizeChange) {
-          onSizeChange(width, height);
-        }
+      // Use fixed render dimensions with scale and pan
+      const width = renderDimensions.width;
+      const height = renderDimensions.height;
+      
+      const scaledWidth = width / scale;
+      const scaledHeight = height / scale;
+      const offsetX = (width - scaledWidth) / 2 - pan.x / scale;
+      const offsetY = (height - scaledHeight) / 2 - pan.y / scale;
+      setViewBox(`${offsetX} ${offsetY} ${scaledWidth} ${scaledHeight}`);
+      
+      // Still notify parent for GraphEditor compatibility
+      if (onSizeChange && containerRef.current) {
+        onSizeChange(containerRef.current.clientWidth, containerRef.current.clientHeight);
       }
     };
 
     updateViewBox();
-    
-    // Use ResizeObserver to detect container size changes
-    const resizeObserver = new ResizeObserver(() => {
-      updateViewBox();
-    });
-
-    if (containerRef.current) {
-      resizeObserver.observe(containerRef.current);
-    }
-
-    // Fallback for window resize
-    window.addEventListener('resize', updateViewBox);
-    
-    // Also update when expansion state changes
-    const timeoutId = setTimeout(updateViewBox, 100);
-
-    return () => {
-      resizeObserver.disconnect();
-      window.removeEventListener('resize', updateViewBox);
-      clearTimeout(timeoutId);
-    };
-  }, [isExpanded, onSizeChange, scale, pan]);
+  }, [scale, pan, renderDimensions, onSizeChange]);
 
   // Handle mouse wheel zoom
   useEffect(() => {
@@ -135,10 +132,10 @@ export const VisualizationCanvas = ({ visualizations, onSizeChange }: Visualizat
   useEffect(() => {
     if (!svgRef.current) return;
 
-    // Clear existing content except the defs and grid
+    // Clear existing content except the defs, grid, and background
     const children = Array.from(svgRef.current.children);
     children.forEach(child => {
-      if (child.tagName !== 'defs' && child.id !== 'grid-rect') {
+      if (child.tagName !== 'defs' && child.id !== 'grid-rect' && child.id !== 'bg-rect') {
         svgRef.current!.removeChild(child);
       }
     });
@@ -147,7 +144,13 @@ export const VisualizationCanvas = ({ visualizations, onSizeChange }: Visualizat
     visualizations.forEach((viz) => {
       renderVisualization(svgRef.current!, viz);
     });
-  }, [visualizations]);
+  }, [visualizations, backgroundColor]);
+
+  // Helper function to append SVG elements in the correct order (after background)
+  const appendShape = (svg: SVGSVGElement, element: SVGElement) => {
+    // Always append at the end - the bg-rect is rendered first in JSX so shapes will be on top
+    svg.appendChild(element);
+  };
 
   const renderVisualization = (svg: SVGSVGElement, viz: VisualizationData) => {
     const { type, data } = viz;
@@ -188,7 +191,7 @@ export const VisualizationCanvas = ({ visualizations, onSizeChange }: Visualizat
     circle.setAttribute("fill-opacity", String(data.opacity || 0.6));
     circle.setAttribute("stroke", data.stroke || "#0891b2");
     circle.setAttribute("stroke-width", String(data.strokeWidth || 2));
-    svg.appendChild(circle);
+    appendShape(svg, circle);
   };
 
   const renderRectangle = (svg: SVGSVGElement, data: any) => {
@@ -202,7 +205,7 @@ export const VisualizationCanvas = ({ visualizations, onSizeChange }: Visualizat
     rect.setAttribute("stroke", data.stroke || "#7c3aed");
     rect.setAttribute("stroke-width", String(data.strokeWidth || 2));
     if (data.rx) rect.setAttribute("rx", String(data.rx));
-    svg.appendChild(rect);
+    appendShape(svg, rect);
   };
 
   const renderLine = (svg: SVGSVGElement, data: any) => {
@@ -213,7 +216,7 @@ export const VisualizationCanvas = ({ visualizations, onSizeChange }: Visualizat
     line.setAttribute("y2", String(data.y2 || 350));
     line.setAttribute("stroke", data.stroke || "#22d3ee");
     line.setAttribute("stroke-width", String(data.strokeWidth || 2));
-    svg.appendChild(line);
+    appendShape(svg, line);
   };
 
   const renderPath = (svg: SVGSVGElement, data: any) => {
@@ -222,7 +225,7 @@ export const VisualizationCanvas = ({ visualizations, onSizeChange }: Visualizat
     path.setAttribute("fill", data.fill || "none");
     path.setAttribute("stroke", data.stroke || "#22d3ee");
     path.setAttribute("stroke-width", String(data.strokeWidth || 2));
-    svg.appendChild(path);
+    appendShape(svg, path);
   };
 
   const renderPolygon = (svg: SVGSVGElement, data: any) => {
@@ -230,9 +233,9 @@ export const VisualizationCanvas = ({ visualizations, onSizeChange }: Visualizat
     polygon.setAttribute("points", data.points || "200,50 250,150 150,150");
     polygon.setAttribute("fill", data.fill || "#34d399");
     polygon.setAttribute("fill-opacity", String(data.opacity || 0.6));
-    polygon.setAttribute("stroke", data.stroke || "#059669");
+    polygon.setAttribute("stroke", data.stroke || "#0891b2");
     polygon.setAttribute("stroke-width", String(data.strokeWidth || 2));
-    svg.appendChild(polygon);
+    appendShape(svg, polygon);
   };
 
   const renderSpiral = (svg: SVGSVGElement, data: any) => {
@@ -252,7 +255,7 @@ export const VisualizationCanvas = ({ visualizations, onSizeChange }: Visualizat
     path.setAttribute("fill", "none");
     path.setAttribute("stroke", data.stroke || "#22d3ee");
     path.setAttribute("stroke-width", String(data.strokeWidth || 2));
-    svg.appendChild(path);
+    appendShape(svg, path);
   };
 
   const renderWave = (svg: SVGSVGElement, data: any) => {
@@ -270,7 +273,7 @@ export const VisualizationCanvas = ({ visualizations, onSizeChange }: Visualizat
     path.setAttribute("fill", "none");
     path.setAttribute("stroke", data.stroke || "#a855f7");
     path.setAttribute("stroke-width", String(data.strokeWidth || 2));
-    svg.appendChild(path);
+    appendShape(svg, path);
   };
 
   return (
@@ -347,7 +350,7 @@ export const VisualizationCanvas = ({ visualizations, onSizeChange }: Visualizat
           viewBox={viewBox}
           className="w-full h-full block"
           style={{ background: "radial-gradient(circle at center, #0f172a 0%, #020617 100%)" }}
-          preserveAspectRatio="none"
+          preserveAspectRatio="xMidYMid meet"
         >
           {/* Grid pattern for reference */}
           <defs>
@@ -362,6 +365,18 @@ export const VisualizationCanvas = ({ visualizations, onSizeChange }: Visualizat
             </pattern>
           </defs>
           <rect id="grid-rect" width="100%" height="100%" fill="url(#grid)" />
+          
+          {/* Background rectangle for the render canvas - rendered first so shapes are on top */}
+          {backgroundColor !== "transparent" && (
+            <rect 
+              id="bg-rect"
+              x="0" 
+              y="0" 
+              width={renderDimensions.width} 
+              height={renderDimensions.height} 
+              fill={backgroundColor}
+            />
+          )}
         </svg>
       </div>
 
@@ -377,7 +392,7 @@ export const VisualizationCanvas = ({ visualizations, onSizeChange }: Visualizat
       
       {/* Canvas dimensions indicator */}
       <div className="absolute bottom-2 left-2 px-2 py-1 rounded bg-black/50 text-xs text-muted-foreground font-mono pointer-events-none">
-        {baseViewBoxRef.current.width} × {baseViewBoxRef.current.height} px • {Math.round(scale * 100)}% zoom
+        {renderDimensions.width} × {renderDimensions.height} px • {Math.round(scale * 100)}% zoom
         <div className="text-[10px] opacity-60 mt-0.5">Ctrl+Scroll to zoom • Click & drag to pan</div>
       </div>
     </div>

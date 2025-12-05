@@ -643,8 +643,8 @@ class CircleVisualizerNode extends LGraphNode {
     this.addInput("Radius", "number");
     this.addInput("Z-Index", "number");
     this.addOutput("Shape", "shape");
-    this.addProperty("x", 400, "number");
-    this.addProperty("y", 200, "number");
+    this.addProperty("x", 960, "number");
+    this.addProperty("y", 540, "number");
     this.addProperty("radius", 50, "number");
     this.addProperty("zIndex", 0, "number");
     this.addProperty("fill", "#22d3ee", "string");
@@ -711,8 +711,8 @@ class RectangleVisualizerNode extends LGraphNode {
     this.addInput("Height", "number");
     this.addInput("Z-Index", "number");
     this.addOutput("Shape", "shape");
-    this.addProperty("x", 350, "number");
-    this.addProperty("y", 150, "number");
+    this.addProperty("x", 960, "number");
+    this.addProperty("y", 540, "number");
     this.addProperty("width", 100, "number");
     this.addProperty("height", 100, "number");
     this.addProperty("zIndex", 0, "number");
@@ -1007,12 +1007,12 @@ class PolarArrayNode extends LGraphNode {
     
     const count = Math.max(1, Math.floor(Math.abs(countInput !== undefined && countInput !== null ? countInput : this.properties.count)));
     const radius = Math.abs(radiusInput !== undefined && radiusInput !== null ? radiusInput : this.properties.radius);
-    // Get canvas center from graph dimensions
-    const graphCanvasWidth = (this.graph as any)?.canvasWidth || 800;
-    const graphCanvasHeight = (this.graph as any)?.canvasHeight || 600;
-    // Use canvas center by default, or input value if provided
-    const cx = xInput !== undefined && xInput !== null ? xInput : graphCanvasWidth / 2;
-    const cy = yInput !== undefined && yInput !== null ? yInput : graphCanvasHeight / 2;
+    // Get render canvas center from Render Output node
+    const renderWidth = (this.graph as any)?.renderWidth || 1920;
+    const renderHeight = (this.graph as any)?.renderHeight || 1080;
+    // Use render canvas center by default, or input value if provided
+    const cx = xInput !== undefined && xInput !== null ? xInput : renderWidth / 2;
+    const cy = yInput !== undefined && yInput !== null ? yInput : renderHeight / 2;
     const rotation = this.properties.rotation * (Math.PI / 180);
 
     const shapes: ShapeData[] = [];
@@ -1212,31 +1212,31 @@ class GridArrayNode extends LGraphNode {
     const columns = Math.max(1, Math.floor(Math.abs(columnsInput !== undefined && columnsInput !== null ? columnsInput : this.properties.columns)));
     const spacingX = spacingXInput !== undefined && spacingXInput !== null ? spacingXInput : this.properties.spacingX;
     const spacingY = spacingYInput !== undefined && spacingYInput !== null ? spacingYInput : this.properties.spacingY;
-    // Get canvas center from graph dimensions
-    const graphCanvasWidth = (this.graph as any)?.canvasWidth || 800;
-    const graphCanvasHeight = (this.graph as any)?.canvasHeight || 600;
+    // Get render canvas center from Render Output node
+    const renderWidth = (this.graph as any)?.renderWidth || 1920;
+    const renderHeight = (this.graph as any)?.renderHeight || 1080;
     
     // Calculate grid dimensions
     const gridWidth = (columns - 1) * spacingX;
     const gridHeight = (rows - 1) * spacingY;
     
     // If Start X/Y inputs are provided, use them directly
-    // Otherwise, center the grid on the canvas
+    // Otherwise, center the grid on the render canvas
     let startX: number;
     let startY: number;
     
     if (startXInput !== undefined && startXInput !== null) {
       startX = startXInput;
     } else {
-      // Center the grid: canvas center - half of grid width
-      startX = (graphCanvasWidth / 2) - (gridWidth / 2);
+      // Center the grid: render canvas center - half of grid width
+      startX = (renderWidth / 2) - (gridWidth / 2);
     }
     
     if (startYInput !== undefined && startYInput !== null) {
       startY = startYInput;
     } else {
-      // Center the grid: canvas center - half of grid height
-      startY = (graphCanvasHeight / 2) - (gridHeight / 2);
+      // Center the grid: render canvas center - half of grid height
+      startY = (renderHeight / 2) - (gridHeight / 2);
     }
 
     const shapes: ShapeData[] = [];
@@ -1432,12 +1432,12 @@ class CircularArrayNode extends LGraphNode {
     
     const count = Math.max(1, Math.floor(Math.abs(countInput !== undefined && countInput !== null ? countInput : this.properties.count)));
     const radius = radiusInput !== undefined && radiusInput !== null ? Math.abs(radiusInput) : this.properties.radius;
-    // Get canvas center from graph dimensions
-    const graphCanvasWidth = (this.graph as any)?.canvasWidth || 800;
-    const graphCanvasHeight = (this.graph as any)?.canvasHeight || 600;
-    // Use canvas center by default, or input value if provided
-    const cx = xInput !== undefined && xInput !== null ? xInput : graphCanvasWidth / 2;
-    const cy = yInput !== undefined && yInput !== null ? yInput : graphCanvasHeight / 2;
+    // Get render canvas center from Render Output node
+    const renderWidth = (this.graph as any)?.renderWidth || 1920;
+    const renderHeight = (this.graph as any)?.renderHeight || 1080;
+    // Use render canvas center by default, or input value if provided
+    const cx = xInput !== undefined && xInput !== null ? xInput : renderWidth / 2;
+    const cy = yInput !== undefined && yInput !== null ? yInput : renderHeight / 2;
     const startAngle = this.properties.startAngle * (Math.PI / 180);
     const endAngle = this.properties.endAngle * (Math.PI / 180);
     const angleRange = endAngle - startAngle;
@@ -1655,8 +1655,8 @@ class ComposeShapesNode extends LGraphNode {
     this.addProperty("aY", 0, "number");
     this.addProperty("bX", 100, "number");
     this.addProperty("bY", 0, "number");
-    this.addProperty("composeX", 400, "number");
-    this.addProperty("composeY", 200, "number");
+    this.addProperty("composeX", 960, "number");
+    this.addProperty("composeY", 540, "number");
     this.size = [220, 200];
     this.color = "#d946ef";
     this.bgcolor = "#a21caf";
@@ -1805,12 +1805,51 @@ class RenderOutputNode extends LGraphNode {
   constructor() {
     super("Render Output");
     this.addInput("Shape/Array", "shape,shape_array");
-    this.size = [200, 60];
+    this.addProperty("width", 1920, "number");
+    this.addProperty("height", 1080, "number");
+    this.addProperty("backgroundColor", "transparent", "string");
+    
+    // Initialize graph dimensions immediately
+    if (this.graph) {
+      (this.graph as any).renderWidth = this.properties.width;
+      (this.graph as any).renderHeight = this.properties.height;
+    }
+    
+    this.addWidget("number", "Width", 1920, (v: number) => {
+      this.properties.width = Math.max(100, v);
+      // Update graph dimensions immediately when widget changes
+      if (this.graph) {
+        (this.graph as any).renderWidth = this.properties.width;
+      }
+    }, { min: 100, max: 7680, step: 10 });
+    this.addWidget("number", "Height", 1080, (v: number) => {
+      this.properties.height = Math.max(100, v);
+      // Update graph dimensions immediately when widget changes
+      if (this.graph) {
+        (this.graph as any).renderHeight = this.properties.height;
+      }
+    }, { min: 100, max: 4320, step: 10 });
+    this.addWidget("text", "BG Color", "transparent", (v: string) => {
+      this.properties.backgroundColor = v;
+    });
+    this.size = [200, 130];
     this.color = "#dc2626";
     this.bgcolor = "#7f1d1d";
   }
 
+  onAdded() {
+    // Ensure dimensions are set when node is added to graph
+    if (this.graph) {
+      (this.graph as any).renderWidth = this.properties.width;
+      (this.graph as any).renderHeight = this.properties.height;
+    }
+  }
+
   onExecute() {
+    // Store render dimensions on graph for nodes to access
+    (this.graph as any).renderWidth = this.properties.width;
+    (this.graph as any).renderHeight = this.properties.height;
+
     // Clear visualizations once at the start of execution cycle
     if (!this.hasCleared) {
       clearVisualizations();
@@ -1837,6 +1876,9 @@ class RenderOutputNode extends LGraphNode {
         type: shape.type,
         data: shape.data,
         timestamp: Date.now() + index, // Add index to ensure unique timestamps
+        canvasWidth: this.properties.width,
+        canvasHeight: this.properties.height,
+        backgroundColor: this.properties.backgroundColor,
       });
     });
   }
@@ -1848,7 +1890,8 @@ class RenderOutputNode extends LGraphNode {
     ctx.fillStyle = "#fca5a5";
     ctx.font = "11px JetBrains Mono, monospace";
     ctx.textAlign = "center";
-    ctx.fillText(`Rendering ${count} shape${count !== 1 ? 's' : ''}`, this.size[0] * 0.5, this.size[1] * 0.75);
+    ctx.fillText(`Rendering ${count} shape${count !== 1 ? 's' : ''}`, this.size[0] * 0.5, this.size[1] * 0.65);
+    ctx.fillText(`${this.properties.width}×${this.properties.height}`, this.size[0] * 0.5, this.size[1] * 0.85);
   }
 }
 
