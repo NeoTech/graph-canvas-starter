@@ -12,55 +12,15 @@ declare module "litegraph.js" {
 
 interface GraphEditorProps {
   onGraphChange?: (graph: LGraph) => void;
+  onGraphReady?: (runOnce: () => void) => void;
+  canvasWidth?: number;
+  canvasHeight?: number;
 }
 
-export const GraphEditor = ({ onGraphChange }: GraphEditorProps) => {
+export const GraphEditor = ({ onGraphChange, onGraphReady, canvasWidth, canvasHeight }: GraphEditorProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const graphRef = useRef<LGraph | null>(null);
   const graphCanvasRef = useRef<LGraphCanvas | null>(null);
-
-  const setupDefaultGraph = useCallback((graph: LGraph) => {
-    // Create Value A node
-    const valueA = LiteGraph.createNode("math/number");
-    if (valueA) {
-      valueA.pos = [100, 150];
-      valueA.properties.value = 5;
-      graph.add(valueA);
-    }
-
-    // Create Multiplier node
-    const multiplier = LiteGraph.createNode("math/number");
-    if (multiplier) {
-      multiplier.pos = [100, 300];
-      multiplier.properties.value = 3;
-      graph.add(multiplier);
-    }
-
-    // Create Multiply node
-    const multiply = LiteGraph.createNode("math/multiply");
-    if (multiply) {
-      multiply.pos = [350, 220];
-      graph.add(multiply);
-    }
-
-    // Create Result node
-    const result = LiteGraph.createNode("display/result");
-    if (result) {
-      result.pos = [600, 220];
-      graph.add(result);
-    }
-
-    // Connect nodes
-    if (valueA && multiply) {
-      valueA.connect(0, multiply, 0);
-    }
-    if (multiplier && multiply) {
-      multiplier.connect(0, multiply, 1);
-    }
-    if (multiply && result) {
-      multiply.connect(0, result, 0);
-    }
-  }, []);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -80,6 +40,12 @@ export const GraphEditor = ({ onGraphChange }: GraphEditorProps) => {
     graphCanvas.render_curved_connections = true;
     graphCanvas.render_connections_border = true;
     graphCanvas.connections_width = 3;
+    
+    // Enable multi-selection drag behavior
+    graphCanvas.allow_dragcanvas = true;
+    graphCanvas.allow_dragnodes = true;
+    (graphCanvas as any).multi_select = false; // Disable multi-select
+    (graphCanvas as any).allow_interaction = true;
 
     // Configure default link colors
     LiteGraph.LINK_COLOR = "#22d3ee";
@@ -98,9 +64,62 @@ export const GraphEditor = ({ onGraphChange }: GraphEditorProps) => {
     // Store refs
     graphRef.current = graph;
     graphCanvasRef.current = graphCanvas;
+    
+    // Store canvas dimensions on the graph for nodes to access
+    (graph as any).canvasWidth = canvasWidth || 800;
+    (graph as any).canvasHeight = canvasHeight || 600;
+    
+    // Disable multi-selection - override selectNodes to always work with single selection
+    const originalSelectNodes = graphCanvas.selectNodes.bind(graphCanvas);
+    graphCanvas.selectNodes = function(nodes: any) {
+      // Only select the first node, ignore the rest
+      if (nodes && nodes.length > 0) {
+        return originalSelectNodes.call(this, [nodes[0]]);
+      }
+      return originalSelectNodes.call(this, nodes);
+    };
+    
+    // Override processMouseDown to clear selections and prevent shift-click multi-select
+    const originalProcessMouseDown = graphCanvas.processMouseDown.bind(graphCanvas);
+    graphCanvas.processMouseDown = function(e: any) {
+      // Remove shift key to prevent multi-select
+      const modifiedEvent = { ...e, shiftKey: false };
+      
+      // Clear existing selections before processing
+      if (this.selected_nodes && Object.keys(this.selected_nodes).length > 0) {
+        for (const nodeId in this.selected_nodes) {
+          if (this.selected_nodes[nodeId]) {
+            this.selected_nodes[nodeId].is_selected = false;
+          }
+        }
+        this.selected_nodes = {};
+      }
+      
+      return originalProcessMouseDown.call(this, modifiedEvent);
+    };
+    
+    // Handle keyboard events for deselection
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // ESC key to deselect all nodes
+      if (e.key === 'Escape') {
+        if (graphCanvas.selected_nodes) {
+          for (const key in graphCanvas.selected_nodes) {
+            graphCanvas.selected_nodes[key].is_selected = false;
+          }
+          graphCanvas.selected_nodes = {};
+        }
+        graphCanvas.node_dragged = null;
+        graphCanvas.node_over = null;
+        graphCanvas.dragging_canvas = false;
+        graphCanvas.setDirty(true, true);
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
 
-    // Setup default example graph
-    setupDefaultGraph(graph);
+    // Add event listener to the canvas element to ensure it gets the event
+    canvasRef.current.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
 
     // Handle resize
     const handleResize = () => {
@@ -112,14 +131,94 @@ export const GraphEditor = ({ onGraphChange }: GraphEditorProps) => {
     };
 
     handleResize();
+    
+    // Use ResizeObserver to detect canvas container size changes
+    const resizeObserver = new ResizeObserver(() => {
+      handleResize();
+    });
+
+    if (canvasRef.current?.parentElement) {
+      resizeObserver.observe(canvasRef.current.parentElement);
+    }
+    
+    // Fallback for window resize
     window.addEventListener("resize", handleResize);
 
-    // Start graph execution
-    graph.start();
+    // Don't auto-start graph - use manual updates instead
+    // graph.start();
+
+    // Create manual run function
+    const runOnce = () => {
+      if (graphRef.current) {
+        graphRef.current.runStep(1);
+        graphCanvas.setDirty(true, true);
+      }
+    };
+
+    // Setup auto-update on graph changes
+    const originalOnConnectionChange = (graph as any).onConnectionChange;
+    (graph as any).onConnectionChange = function(type: any) {
+      if (originalOnConnectionChange) originalOnConnectionChange.call(this, type);
+      // Run once when connections change
+      setTimeout(runOnce, 10);
+    };
+
+    // Hook into node additions to detect property and widget changes
+    const originalOnNodeAdded = (graph as any).onNodeAdded;
+    (graph as any).onNodeAdded = function(node: any) {
+      if (originalOnNodeAdded) originalOnNodeAdded.call(this, node);
+      
+      // Override onPropertyChanged for this node
+      const originalOnPropertyChanged = node.onPropertyChanged;
+      node.onPropertyChanged = function(name: any, value: any) {
+        if (originalOnPropertyChanged) originalOnPropertyChanged.call(this, name, value);
+        // Trigger update when property changes
+        setTimeout(runOnce, 10);
+      };
+
+      // Hook into widgets if they exist
+      if (node.widgets) {
+        node.widgets.forEach((widget: any) => {
+          const originalCallback = widget.callback;
+          widget.callback = function(value: any, ...args: any[]) {
+            if (originalCallback) originalCallback.call(this, value, ...args);
+            // Trigger update when widget value changes
+            setTimeout(runOnce, 10);
+          };
+        });
+      }
+    };
+
+    // Also hook into existing nodes at initialization using computeExecutionOrder
+    const nodes = (graph as any)._nodes || [];
+    nodes.forEach((node: any) => {
+      // Override onPropertyChanged
+      const originalOnPropertyChanged = node.onPropertyChanged;
+      node.onPropertyChanged = function(name: any, value: any) {
+        if (originalOnPropertyChanged) originalOnPropertyChanged.call(this, name, value);
+        setTimeout(runOnce, 10);
+      };
+
+      // Hook into widgets
+      if (node.widgets) {
+        node.widgets.forEach((widget: any) => {
+          const originalCallback = widget.callback;
+          widget.callback = function(value: any, ...args: any[]) {
+            if (originalCallback) originalCallback.call(this, value, ...args);
+            setTimeout(runOnce, 10);
+          };
+        });
+      }
+    });
 
     // Notify parent of graph changes
     if (onGraphChange) {
       onGraphChange(graph);
+    }
+
+    // Provide runOnce to parent
+    if (onGraphReady) {
+      onGraphReady(runOnce);
     }
 
     // Redraw on execution
@@ -128,16 +227,31 @@ export const GraphEditor = ({ onGraphChange }: GraphEditorProps) => {
     };
 
     return () => {
+      if (canvasRef.current) {
+        canvasRef.current.removeEventListener("keydown", handleKeyDown);
+      }
+      window.removeEventListener("keydown", handleKeyDown);
+      resizeObserver.disconnect();
       window.removeEventListener("resize", handleResize);
-      graph.stop();
+      // graph.stop(); // Not needed since we're not auto-running
     };
-  }, [setupDefaultGraph, onGraphChange]);
+  }, [onGraphChange, onGraphReady]);
+  
+  // Update canvas dimensions on the graph when they change
+  useEffect(() => {
+    if (graphRef.current) {
+      (graphRef.current as any).canvasWidth = canvasWidth || 800;
+      (graphRef.current as any).canvasHeight = canvasHeight || 600;
+    }
+  }, [canvasWidth, canvasHeight]);
 
   return (
     <div className="relative w-full h-full bg-graph-bg overflow-hidden graph-editor">
       <canvas
         ref={canvasRef}
         className="absolute inset-0 w-full h-full"
+        tabIndex={0}
+        style={{ outline: 'none' }}
       />
       {/* Overlay gradient for depth */}
       <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-background/20 via-transparent to-transparent" />

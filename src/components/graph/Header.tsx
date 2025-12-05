@@ -1,14 +1,13 @@
-import { Play, Square, RotateCcw, Maximize2, Zap } from "lucide-react";
+import { RefreshCw, RotateCcw, Maximize2, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface HeaderProps {
-  isRunning: boolean;
-  onToggleRun: () => void;
+  onUpdate: () => void;
   onReset: () => void;
   onFitView: () => void;
 }
 
-export const Header = ({ isRunning, onToggleRun, onReset, onFitView }: HeaderProps) => {
+export const Header = ({ onUpdate, onReset, onFitView }: HeaderProps) => {
   return (
     <header className="h-14 bg-card border-b border-border flex items-center justify-between px-4">
       {/* Title */}
@@ -19,7 +18,7 @@ export const Header = ({ isRunning, onToggleRun, onReset, onFitView }: HeaderPro
         </div>
         <div className="h-4 w-px bg-border" />
         <span className="text-sm text-muted-foreground font-mono">
-          Multiplication Example
+          A computational visualization aid
         </span>
       </div>
 
@@ -48,22 +47,13 @@ export const Header = ({ isRunning, onToggleRun, onReset, onFitView }: HeaderPro
         <div className="h-4 w-px bg-border mx-1" />
 
         <Button
-          variant={isRunning ? "destructive" : "default"}
+          variant="default"
           size="sm"
-          onClick={onToggleRun}
-          className={isRunning ? "" : "bg-primary hover:bg-primary/90 text-primary-foreground"}
+          onClick={onUpdate}
+          className="bg-primary hover:bg-primary/90 text-primary-foreground"
         >
-          {isRunning ? (
-            <>
-              <Square className="w-4 h-4 mr-2" />
-              Stop
-            </>
-          ) : (
-            <>
-              <Play className="w-4 h-4 mr-2" />
-              Run
-            </>
-          )}
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Update
         </Button>
       </div>
     </header>
