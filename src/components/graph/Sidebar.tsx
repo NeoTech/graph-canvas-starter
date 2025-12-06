@@ -39,11 +39,11 @@ const nodeCategories = [
     name: "Visualization",
     icon: Layers,
     nodes: [
-      { type: "visualization/circle", label: "Circle", desc: "Render a circle shape" },
-      { type: "visualization/rectangle", label: "Rectangle", desc: "Render a rectangle" },
-      { type: "visualization/spiral", label: "Spiral", desc: "Generate spiral pattern" },
-      { type: "visualization/wave", label: "Wave", desc: "Generate sine wave" },
-      { type: "visualization/polygon", label: "Polygon", desc: "Render N-sided polygon" },
+      { type: "shapes/circle", label: "Circle", desc: "Render a circle shape" },
+      { type: "shapes/rectangle", label: "Rectangle", desc: "Render a rectangle" },
+      { type: "shapes/spiral", label: "Spiral", desc: "Generate spiral pattern" },
+      { type: "shapes/wave", label: "Wave", desc: "Generate sine wave" },
+      { type: "shapes/polygon", label: "Polygon", desc: "Render N-sided polygon" },
     ],
   },
   {
