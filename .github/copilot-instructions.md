@@ -593,15 +593,11 @@ npm run dev  # Vite dev server on localhost:8080
    - Measurement visualization overlay
    - Export metadata for CNC/laser cutters
 
-6. **UI/UX Improvements**
+5. **UI/UX Improvements**
    - Persist sidebar collapsed/expanded state
    - Remember last opened node graph
    - Node graph preset library
    - User preferences storage (localStorage)
-
-7. **Docker Container build**
-   - Create a docker build script for this application.
-   - Create a docker-compose run script for the container.
 
 ### Implementation Notes for Future Developers
 - **Export**: SVG serialization from `VisualizationCanvas.tsx` svgRef, embed graph JSON in `<metadata>` tags
