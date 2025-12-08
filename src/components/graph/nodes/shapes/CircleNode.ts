@@ -41,10 +41,10 @@ export class CircleVisualizerNode extends LGraphNode {
     const radiusInput = this.getInputData(2);
     const zIndexInput = this.getInputData(3);
     
-    // Local coordinates - center at (0,0) by default
-    // X/Y inputs allow local positioning relative to parent group
-    const x = xInput !== undefined && xInput !== null ? xInput : 0;
-    const y = yInput !== undefined && yInput !== null ? yInput : 0;
+    // Priority: Input > Property (widget value)
+    // Local coordinates - use widget values by default
+    const x = xInput !== undefined && xInput !== null ? xInput : this.properties.x;
+    const y = yInput !== undefined && yInput !== null ? yInput : this.properties.y;
     const radius = radiusInput !== undefined && radiusInput !== null ? radiusInput : this.properties.radius;
     const zIndex = zIndexInput !== undefined && zIndexInput !== null ? zIndexInput : this.properties.zIndex;
 

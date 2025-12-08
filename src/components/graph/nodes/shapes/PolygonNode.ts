@@ -47,10 +47,10 @@ export class PolygonVisualizerNode extends LGraphNode {
     const radiusInput = this.getInputData(3);
     const zIndexInput = this.getInputData(4);
     
-    // Local coordinates - center at (0,0) by default
-    // X/Y inputs allow local positioning relative to parent group
-    const cx = xInput !== undefined && xInput !== null ? xInput : 0;
-    const cy = yInput !== undefined && yInput !== null ? yInput : 0;
+    // Priority: Input > Property (widget value)
+    // Local coordinates - use widget values by default
+    const cx = xInput !== undefined && xInput !== null ? xInput : this.properties.centerX;
+    const cy = yInput !== undefined && yInput !== null ? yInput : this.properties.centerY;
     const sides = Math.max(3, Math.floor(Math.abs(sidesInput !== undefined && sidesInput !== null ? sidesInput : this.properties.sides)));
     const radius = Math.abs(radiusInput !== undefined && radiusInput !== null ? radiusInput : this.properties.radius);
     const zIndex = zIndexInput !== undefined && zIndexInput !== null ? zIndexInput : this.properties.zIndex;

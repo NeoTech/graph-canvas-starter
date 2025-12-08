@@ -97,9 +97,10 @@ src/components/graph/nodes/
 │   ├── CircularArrayNode.ts   # Circular array transformation
 │   ├── MergeArraysNode.ts     # Array merging
 │   └── ComposeShapesNode.ts   # Shape composition
-└── output/                     # 2 output nodes
+└── output/                     # 3 output nodes
     ├── ResultNode.ts          # Numeric result display
-    └── RenderOutputNode.ts    # SVG canvas output
+    ├── RenderOutputNode.ts    # SVG canvas output
+    └── AnimateNode.ts         # Value animation over time
 ```
 
 ### Creating Shape Nodes (Local Coordinates)
@@ -305,6 +306,47 @@ sortedShapes.forEach((shape: ShapeData, index: number) => {
 });
 ```
 
+### Animate Node (Time-Based Value Animation)
+**Location**: `src/components/graph/nodes/output/AnimateNode.ts`
+
+The Animate node provides real-time value animation with play/pause/reset controls:
+
+**Features**:
+- **Value Input/Widget**: Starting value for animation (default: 0)
+- **Modifier Input/Widget**: Amount to add per frame (default: 1)
+- **FPS Widget**: Animation speed in frames per second (1-120 FPS, default: 30)
+- **Current Display**: Read-only widget showing live animated value
+- **Play/Stop Button**: Toggles animation (button text updates dynamically)
+- **Reset Button**: Stops animation and restores initial value
+
+**Critical Implementation Details**:
+```typescript
+private hasStarted: boolean = false; // Prevents value reset on stop
+
+// State transitions:
+// Initial → hasStarted=false, isPlaying=false → updates from inputs/widgets
+// Play → hasStarted=true, isPlaying=true → animation runs
+// Stop → hasStarted=true, isPlaying=false → preserves currentValue
+// Reset → hasStarted=false → restores initialValue
+```
+
+**Animation Loop Pattern**:
+- Uses `requestAnimationFrame` with frame timing for consistent FPS
+- Triggers `graph.runStep(1)` each frame to update visualization
+- Automatically cleans up animation on node removal
+- Current value persists when stopped (doesn't reset until Reset button clicked)
+
+**Usage Example**:
+```typescript
+// Connect Animate output to shape X/Y position for movement
+Animate (value: 0, modifier: 5) → Circle.X → creates horizontal motion
+```
+
+**Widget State Management**:
+- Value/Modifier widgets only update properties when animation is NOT playing
+- Current value widget is read-only (disabled) and updates every frame
+- Play button label toggles between "Play" and "Stop"
+
 ## SVG Rendering System
 
 ### Group Rendering (CRITICAL)
@@ -478,13 +520,25 @@ npm run dev  # Vite dev server on localhost:8080
 
 4. **Widget Updates**: Render Output widgets update graph dimensions immediately, not just in `onExecute()`
 
-5. **Background Disappearing**: Ensure `id="bg-rect"` on background rect and preserve it during SVG cleanup
+5. **Shape Widget Values** (CRITICAL - Dec 2024 Fix):
+   - **Priority**: `Input > Property (widget value)`
+   - **Pitfall**: Shape nodes defaulting to 0 when no input connected instead of using widget values
+   - **Fix**: Use `const x = xInput !== undefined && xInput !== null ? xInput : this.properties.x`
+   - All shape nodes (Circle, Rectangle, Polygon, Spiral, Wave) must respect widget X/Y values
 
-6. **zIndex Ignored**: Render Output sorts by zIndex - shapes must have this property
+6. **Background Disappearing**: Ensure `id="bg-rect"` on background rect and preserve it during SVG cleanup
 
-7. **Context Menus**: Disabled via overriding `getCanvasMenuOptions()`, `getNodeMenuOptions()`, `getGroupMenuOptions()` in GraphEditor
+7. **zIndex Ignored**: Render Output sorts by zIndex - shapes must have this property
 
-8. **ResizablePanel Behavior** (Index.tsx split-view layout):
+8. **Context Menus**: Disabled via overriding `getCanvasMenuOptions()`, `getNodeMenuOptions()`, `getGroupMenuOptions()` in GraphEditor
+
+9. **Animate Node State Management** (CRITICAL):
+   - **hasStarted flag**: Prevents currentValue reset when stopped
+   - **Pitfall**: Stop button resets value because `onExecute()` updates currentValue when `!isPlaying`
+   - **Fix**: Only update currentValue when `!isPlaying && !hasStarted` (never started state)
+   - Stop preserves position, Reset restores initial value
+
+10. **ResizablePanel Behavior** (Index.tsx split-view layout):
    - **CRITICAL**: With `direction="vertical"`, the **first panel in DOM** grows when you drag the handle **down**
    - **DOM Order Controls Resize**: Place the panel you want to grow on drag-down FIRST in the DOM
    - **Visual Layout**: Flexbox naturally stacks panels in DOM order (first = top, second = bottom)
@@ -506,7 +560,7 @@ npm run dev  # Vite dev server on localhost:8080
   - `math/` - Mathematical operation nodes (16 files: Number, Add, Subtract, Multiply, Divide, Modulo, Power, Abs, Floor, Ceil, Round, Random, Min, Max, Sine, Cosine)
   - `shapes/` - Geometric shape nodes (5 files: Circle, Rectangle, Spiral, Wave, Polygon)
   - `patterns/` - Array and pattern generator nodes (5 files: PolarArray, GridArray, CircularArray, MergeArrays, ComposeShapes)
-  - `output/` - Output and display nodes (2 files: Result, RenderOutput)
+  - `output/` - Output and display nodes (3 files: Result, RenderOutput, Animate)
   - `utils/` - Shared utilities (1 file: visualization callbacks, event emitters, ShapeData type)
 - `src/components/graph/` - Graph editor UI components
 - `src/components/ui/` - shadcn/ui component library
@@ -545,13 +599,7 @@ npm run dev  # Vite dev server on localhost:8080
    - Node graph preset library
    - User preferences storage (localStorage)
 
-7. **Animation System**
-   - Animate node for real-time value interpolation
-   - Playback controls (play/pause/speed)
-   - Timeline visualization
-   - Live SVG updates during animation
-
-8. **Docker Container build**
+7. **Docker Container build**
    - Create a docker build script for this application.
    - Create a docker-compose run script for the container.
 
@@ -561,4 +609,3 @@ npm run dev  # Vite dev server on localhost:8080
 - **Color Changes**: Add color inputs to shape nodes, update `renderVisualization()` switch cases
 - **Image Fills**: Use SVG `<pattern>` with `<image>` elements in defs, apply as fill attribute
 - **Scale System**: New utility node that multiplies coordinates by scale factor before Render Output
-- **Animation**: useEffect hook with requestAnimationFrame, interpolate property values over time

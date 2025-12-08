@@ -39,6 +39,7 @@ import { ComposeShapesNode } from "./patterns/ComposeShapesNode";
 // Import Output Nodes
 import { ResultNode } from "./output/ResultNode";
 import { RenderOutputNode } from "./output/RenderOutputNode";
+import { AnimateNode } from "./output/AnimateNode";
 
 /**
  * Register all custom nodes with LiteGraph
@@ -65,6 +66,7 @@ export function registerCustomNodes() {
 
   // Register display nodes
   LiteGraph.registerNodeType("display/result", ResultNode);
+  LiteGraph.registerNodeType("display/animate", AnimateNode);
   
   // Register shape nodes
   LiteGraph.registerNodeType("shapes/circle", CircleVisualizerNode);
@@ -101,6 +103,7 @@ export function registerCustomNodes() {
   (SineNode as any).title_color = "#7c3aed";
   (CosineNode as any).title_color = "#7c3aed";
   (ResultNode as any).title_color = "#059669";
+  (AnimateNode as any).title_color = "#7c2d12";
   (CircleVisualizerNode as any).title_color = "#0891b2";
   (RectangleVisualizerNode as any).title_color = "#7c3aed";
   (SpiralVisualizerNode as any).title_color = "#0891b2";

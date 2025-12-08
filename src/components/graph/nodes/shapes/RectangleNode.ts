@@ -47,10 +47,10 @@ export class RectangleVisualizerNode extends LGraphNode {
     const heightInput = this.getInputData(3);
     const zIndexInput = this.getInputData(4);
     
-    // Local coordinates - top-left at (0,0) by default, or centered if X/Y provided
-    // X/Y inputs allow local positioning relative to parent group
-    const x = xInput !== undefined && xInput !== null ? xInput : 0;
-    const y = yInput !== undefined && yInput !== null ? yInput : 0;
+    // Priority: Input > Property (widget value)
+    // Local coordinates - use widget values by default
+    const x = xInput !== undefined && xInput !== null ? xInput : this.properties.x;
+    const y = yInput !== undefined && yInput !== null ? yInput : this.properties.y;
     const width = widthInput !== undefined && widthInput !== null ? widthInput : this.properties.width;
     const height = heightInput !== undefined && heightInput !== null ? heightInput : this.properties.height;
     const zIndex = zIndexInput !== undefined && zIndexInput !== null ? zIndexInput : this.properties.zIndex;

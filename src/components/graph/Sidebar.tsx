@@ -33,6 +33,7 @@ const nodeCategories = [
     icon: MonitorDot,
     nodes: [
       { type: "display/result", label: "Result", desc: "Display final result" },
+      { type: "display/animate", label: "Animate", desc: "Animate values over time" },
     ],
   },
   {
