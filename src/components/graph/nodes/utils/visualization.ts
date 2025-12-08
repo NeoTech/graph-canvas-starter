@@ -27,6 +27,10 @@ export function clearVisualizations() {
 // Shape data type for passing between nodes
 export interface ShapeData {
   type: string;
-  data: any;
+  data?: any;                  // Optional for group types
   zIndex?: number;
+  // For SVG group wrappers
+  isGroup?: boolean;           // True if this is a group container
+  children?: ShapeData[];      // Child shapes within the group
+  transform?: string;          // SVG transform attribute (e.g., "translate(100, 200)")
 }

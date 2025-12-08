@@ -13,14 +13,48 @@ declare module "litegraph.js" {
 interface GraphEditorProps {
   onGraphChange?: (graph: LGraph) => void;
   onGraphReady?: (runOnce: () => void) => void;
+  onRenderOutputPresent?: (isPresent: boolean) => void;
+  onGraphStats?: (nodeCount: number, connectionCount: number) => void;
   canvasWidth?: number;
   canvasHeight?: number;
 }
 
-export const GraphEditor = ({ onGraphChange, onGraphReady, canvasWidth, canvasHeight }: GraphEditorProps) => {
+export const GraphEditor = ({ onGraphChange, onGraphReady, onRenderOutputPresent, onGraphStats, canvasWidth, canvasHeight }: GraphEditorProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const graphRef = useRef<LGraph | null>(null);
   const graphCanvasRef = useRef<LGraphCanvas | null>(null);
+  const onRenderOutputPresentRef = useRef(onRenderOutputPresent);
+  const onGraphStatsRef = useRef(onGraphStats);
+
+  // Update ref when callback changes
+  useEffect(() => {
+    onRenderOutputPresentRef.current = onRenderOutputPresent;
+  }, [onRenderOutputPresent]);
+
+  // Update ref when callback changes
+  useEffect(() => {
+    onGraphStatsRef.current = onGraphStats;
+  }, [onGraphStats]);
+
+  const updateGraphStats = useCallback((graph: LGraph) => {
+    if (!onGraphStatsRef.current) return;
+    const nodes = (graph as any)._nodes || [];
+    const connectionCount = graph.links ? Object.keys(graph.links).length : 0;
+    onGraphStatsRef.current(nodes.length, connectionCount);
+  }, []);
+
+  const checkRenderOutputNode = useCallback((graph: LGraph) => {
+    if (!onRenderOutputPresentRef.current) return;
+    const nodes = (graph as any)._nodes || [];
+    const hasRenderOutput = nodes.some((node: any) => node.type === "output/render");
+    // Use requestAnimationFrame to defer the callback and prevent interference with node operations
+    requestAnimationFrame(() => {
+      if (onRenderOutputPresentRef.current) {
+        onRenderOutputPresentRef.current(hasRenderOutput);
+      }
+      updateGraphStats(graph);
+    });
+  }, [updateGraphStats]);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -171,6 +205,9 @@ export const GraphEditor = ({ onGraphChange, onGraphReady, canvasWidth, canvasHe
     (graph as any).onNodeAdded = function(node: any) {
       if (originalOnNodeAdded) originalOnNodeAdded.call(this, node);
       
+      // Check for render output node with a slight delay to ensure node is fully added
+      setTimeout(() => checkRenderOutputNode(graph), 0);
+      
       // Override onPropertyChanged for this node
       const originalOnPropertyChanged = node.onPropertyChanged;
       node.onPropertyChanged = function(name: any, value: any) {
@@ -213,6 +250,17 @@ export const GraphEditor = ({ onGraphChange, onGraphReady, canvasWidth, canvasHe
         });
       }
     });
+
+    // Hook into node removal to check for render output
+    const originalRemove = (graph as any).remove;
+    (graph as any).remove = function(node: any) {
+      const result = originalRemove.call(this, node);
+      setTimeout(() => checkRenderOutputNode(graph), 0);
+      return result;
+    };
+
+    // Initial check for render output node
+    setTimeout(() => checkRenderOutputNode(graph), 0);
 
     // Notify parent of graph changes
     if (onGraphChange) {

@@ -31,7 +31,7 @@ export class ComposeShapesNode extends LGraphNode {
     const shapeA = this.getInputData(0);
     const shapeB = this.getInputData(1);
 
-    if (!shapeA || !shapeB) {
+    if (!shapeA && !shapeB) {
       this.setOutputData(0, []);
       return;
     }
@@ -43,106 +43,64 @@ export class ComposeShapesNode extends LGraphNode {
     const composeXInput = this.getInputData(6);
     const composeYInput = this.getInputData(7);
 
+    // Get render canvas dimensions for default center
+    const renderWidth = (this.graph as any)?.renderWidth || 1920;
+    const renderHeight = (this.graph as any)?.renderHeight || 1080;
+
+    // A X/Y and B X/Y are offsets relative to compose position
     const aX = aXInput !== undefined && aXInput !== null ? aXInput : this.properties.aX;
     const aY = aYInput !== undefined && aYInput !== null ? aYInput : this.properties.aY;
     const bX = bXInput !== undefined && bXInput !== null ? bXInput : this.properties.bX;
     const bY = bYInput !== undefined && bYInput !== null ? bYInput : this.properties.bY;
-    const composeX = composeXInput !== undefined && composeXInput !== null ? composeXInput : this.properties.composeX;
-    const composeY = composeYInput !== undefined && composeYInput !== null ? composeYInput : this.properties.composeY;
+    
+    // Compose X/Y is the base position for the composition
+    // If NOT explicitly connected, default to canvas center for global positioning
+    // If connected (even to 0), use that value for explicit positioning
+    const hasComposeInput = composeXInput !== undefined && composeXInput !== null && 
+                           composeYInput !== undefined && composeYInput !== null;
+    
+    // When compose inputs are connected, use them (allows explicit 0,0 positioning)
+    // When not connected, default to canvas center (for standalone rendering)
+    const composeX = hasComposeInput ? composeXInput : renderWidth / 2;
+    const composeY = hasComposeInput ? composeYInput : renderHeight / 2;
 
-    // Convert single shapes to arrays
-    const shapesA = Array.isArray(shapeA) ? shapeA : [shapeA];
-    const shapesB = Array.isArray(shapeB) ? shapeB : [shapeB];
-
-    // Calculate bounding box for all input shapes to find their center
-    const boundsA = this.calculateBounds(shapesA);
-    const boundsB = this.calculateBounds(shapesB);
-
-    // Calculate centers of each shape group
-    const centerA = {
-      x: boundsA.minX + (boundsA.maxX - boundsA.minX) / 2,
-      y: boundsA.minY + (boundsA.maxY - boundsA.minY) / 2
-    };
-    const centerB = {
-      x: boundsB.minX + (boundsB.maxX - boundsB.minX) / 2,
-      y: boundsB.minY + (boundsB.maxY - boundsB.minY) / 2
-    };
-
-    // Create composed array with offset shapes
     const composed: ShapeData[] = [];
 
-    // Add shapes A with offset relative to their center, then offset by compose position
-    shapesA.forEach((shape: ShapeData) => {
-      const offsetShape = this.offsetShape(shape, composeX + aX - centerA.x, composeY + aY - centerA.y);
-      composed.push(offsetShape);
-    });
-
-    // Add shapes B with offset relative to their center, then offset by compose position
-    shapesB.forEach((shape: ShapeData) => {
-      const offsetShape = this.offsetShape(shape, composeX + bX - centerB.x, composeY + bY - centerB.y);
-      composed.push(offsetShape);
-    });
-
-    this.setOutputData(0, composed);
-  }
-
-  calculateBounds(shapes: ShapeData[]): { minX: number; minY: number; maxX: number; maxY: number } {
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-
-    shapes.forEach(shape => {
-      if (shape.type === "circle") {
-        const r = shape.data.radius || 0;
-        minX = Math.min(minX, shape.data.x - r);
-        minY = Math.min(minY, shape.data.y - r);
-        maxX = Math.max(maxX, shape.data.x + r);
-        maxY = Math.max(maxY, shape.data.y + r);
-      } else if (shape.type === "rectangle") {
-        minX = Math.min(minX, shape.data.x);
-        minY = Math.min(minY, shape.data.y);
-        maxX = Math.max(maxX, shape.data.x + shape.data.width);
-        maxY = Math.max(maxY, shape.data.y + shape.data.height);
-      } else if (shape.type === "polygon" && shape.data.points) {
-        const points = shape.data.points.split(' ');
-        points.forEach((point: string) => {
-          const [x, y] = point.split(',').map(Number);
-          minX = Math.min(minX, x);
-          minY = Math.min(minY, y);
-          maxX = Math.max(maxX, x);
-          maxY = Math.max(maxY, y);
-        });
-      }
-    });
-
-    return { minX, minY, maxX, maxY };
-  }
-
-  offsetShape(shape: ShapeData, offsetX: number, offsetY: number): ShapeData {
-    const transformed = JSON.parse(JSON.stringify(shape));
-
-    if (shape.type === "circle") {
-      transformed.data.x = shape.data.x + offsetX;
-      transformed.data.y = shape.data.y + offsetY;
-    } else if (shape.type === "rectangle") {
-      transformed.data.x = shape.data.x + offsetX;
-      transformed.data.y = shape.data.y + offsetY;
-    } else if (shape.type === "polygon" && shape.data.points) {
-      const points = shape.data.points.split(' ');
-      const transformedPoints = points.map((point: string) => {
-        const [x, y] = point.split(',').map(Number);
-        return `${(x + offsetX).toFixed(2)},${(y + offsetY).toFixed(2)}`;
-      });
-      transformed.data.points = transformedPoints.join(' ');
+    // Handle Shape A
+    // ComposeShapes ONLY deals with group positioning via wrapper group
+    // If input is already groups (from array), wrap all in one parent group with transform
+    if (shapeA) {
+      const shapesA = Array.isArray(shapeA) ? shapeA : [shapeA];
       
-      if (shape.data.centerX !== undefined) {
-        transformed.data.centerX = shape.data.centerX + offsetX;
-        transformed.data.centerY = shape.data.centerY + offsetY;
-      }
-    } else if (shape.type === "spiral" || shape.type === "wave") {
-      transformed.data.x = shape.data.x + offsetX;
-      transformed.data.y = shape.data.y + offsetY;
+      // Create a wrapper group that applies the compose transform
+      // This group contains all input shapes/groups as children
+      const groupA: ShapeData = {
+        type: "group",
+        isGroup: true,
+        children: shapesA,
+        // Position entire input (whether shapes or groups) at compose position + A offsets
+        transform: `translate(${composeX + aX}, ${composeY + aY})`,
+        zIndex: 0
+      };
+      composed.push(groupA);
     }
 
-    return transformed;
+    // Handle Shape B
+    if (shapeB) {
+      const shapesB = Array.isArray(shapeB) ? shapeB : [shapeB];
+      
+      const groupB: ShapeData = {
+        type: "group",
+        isGroup: true,
+        children: shapesB,
+        // Position entire input at compose position + B offsets
+        transform: `translate(${composeX + bX}, ${composeY + bY})`,
+        zIndex: 0
+      };
+      composed.push(groupB);
+    }
+
+    this.setOutputData(0, composed);
   }
 
   onDrawForeground(ctx: CanvasRenderingContext2D) {

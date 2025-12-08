@@ -12,6 +12,9 @@ const Index = () => {
   const [visualizations, setVisualizations] = useState<VisualizationData[]>([]);
   const [canvasWidth, setCanvasWidth] = useState<number>(800);
   const [canvasHeight, setCanvasHeight] = useState<number>(600);
+  const [hasRenderOutput, setHasRenderOutput] = useState<boolean>(false);
+  const [nodeCount, setNodeCount] = useState<number>(0);
+  const [connectionCount, setConnectionCount] = useState<number>(0);
   const graphRef = useRef<LGraph | null>(null);
   const runOnceRef = useRef<(() => void) | null>(null);
   const fitViewRef = useRef<(() => void) | null>(null);
@@ -38,6 +41,11 @@ const Index = () => {
 
   const handleGraphChange = useCallback((graph: LGraph) => {
     graphRef.current = graph;
+    
+    // Update statistics
+    setNodeCount((graph as any)._nodes?.length || 0);
+    setConnectionCount(graph.links ? Object.keys(graph.links).length : 0);
+    
     toast.success("Graph initialized", {
       description: "Add visualization nodes to see SVG output!",
     });
@@ -50,6 +58,13 @@ const Index = () => {
   const handleUpdate = useCallback(() => {
     if (runOnceRef.current) {
       runOnceRef.current();
+      
+      // Update statistics after graph execution
+      if (graphRef.current) {
+        setNodeCount((graphRef.current as any)._nodes?.length || 0);
+        setConnectionCount(graphRef.current.links ? Object.keys(graphRef.current.links).length : 0);
+      }
+      
       toast.success("Graph updated");
     }
   }, []);
@@ -69,6 +84,15 @@ const Index = () => {
     fitViewRef.current = fitViewFn;
   }, []);
 
+  const handleRenderOutputPresent = useCallback((isPresent: boolean) => {
+    setHasRenderOutput(isPresent);
+  }, []);
+
+  const handleGraphStats = useCallback((nodeCount: number, connectionCount: number) => {
+    setNodeCount(nodeCount);
+    setConnectionCount(connectionCount);
+  }, []);
+
   const handleAddNode = useCallback((type: string) => {
     if (graphRef.current) {
       const node = LiteGraph.createNode(type);
@@ -76,6 +100,11 @@ const Index = () => {
         // Position new node in the center-ish area
         node.pos = [300 + Math.random() * 100, 200 + Math.random() * 100];
         graphRef.current.add(node);
+        
+        // Update statistics
+        setNodeCount((graphRef.current as any)._nodes?.length || 0);
+        setConnectionCount(graphRef.current.links ? Object.keys(graphRef.current.links).length : 0);
+        
         toast.success(`Added ${type.split("/")[1]} node`);
       }
     }
@@ -94,39 +123,84 @@ const Index = () => {
         
         <main className="flex-1 relative overflow-hidden">
           <ResizablePanelGroup direction="vertical">
-            {/* Visualization Canvas - Top */}
-            <ResizablePanel defaultSize={50} minSize={20}>
-              <VisualizationCanvas 
-                visualizations={visualizations}
-                onSizeChange={(width, height) => {
-                  setCanvasWidth(width);
-                  setCanvasHeight(height);
-                }}
-                onFitViewReady={handleFitViewReady}
-              />
-            </ResizablePanel>
-            
-            <ResizableHandle withHandle />
-            
-            {/* Graph Editor - Bottom */}
-            <ResizablePanel defaultSize={50} minSize={20}>
-              <div className="relative h-full">
-                <GraphEditor 
-                  onGraphChange={handleGraphChange}
-                  onGraphReady={handleGraphReady}
-                  canvasWidth={canvasWidth}
-                  canvasHeight={canvasHeight}
-                />
+            {/* Graph Editor - First in DOM, controls resize behavior */}
+            <ResizablePanel defaultSize={hasRenderOutput ? 50 : 100} minSize={20}>
+              <div className="relative h-full flex flex-col">
+                <div className="flex-1 overflow-hidden">
+                  <GraphEditor 
+                    onGraphChange={handleGraphChange}
+                    onGraphReady={handleGraphReady}
+                    onRenderOutputPresent={handleRenderOutputPresent}
+                    onGraphStats={handleGraphStats}
+                    canvasWidth={canvasWidth}
+                    canvasHeight={canvasHeight}
+                  />
+                </div>
                 
-                {/* Status indicator */}
-                <div className="absolute bottom-4 right-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-card/80 backdrop-blur border border-border">
-                  <div className="w-2 h-2 rounded-full bg-muted-foreground" />
-                  <span className="text-xs font-mono text-muted-foreground">
-                    Manual Update
-                  </span>
+                {/* Status Bar - Bottom */}
+                <div className="h-8 border-t border-border bg-card/95 backdrop-blur flex items-center justify-between px-4 text-xs">
+                  {/* Left side - Graph statistics */}
+                  <div className="flex items-center gap-4 text-muted-foreground">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                      <span className="font-mono">
+                        <span className="font-semibold text-foreground">{nodeCount}</span> nodes
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                      <span className="font-mono">
+                        <span className="font-semibold text-foreground">{visualizations.length}</span> shapes
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                      <span className="font-mono">
+                        <span className="font-semibold text-foreground">{connectionCount}</span> connections
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Right side - Messages and status */}
+                  <div className="flex items-center gap-3">
+                    {!hasRenderOutput ? (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <span>Add a <span className="font-semibold text-foreground">Render Output</span> node to see visualization canvas</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        <span className="font-mono text-muted-foreground">Ready to render</span>
+                      </div>
+                    )}
+                    <div className="h-4 w-px bg-border" />
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
+                      <span className="font-mono">Manual Update</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </ResizablePanel>
+            
+            {/* Visualization Canvas - Second in DOM */}
+            {hasRenderOutput && (
+              <>
+                <ResizableHandle withHandle />
+                
+                <ResizablePanel defaultSize={50} minSize={20}>
+                  <VisualizationCanvas 
+                    visualizations={visualizations}
+                    onSizeChange={(width, height) => {
+                      setCanvasWidth(width);
+                      setCanvasHeight(height);
+                    }}
+                    onFitViewReady={handleFitViewReady}
+                    graph={graphRef.current}
+                  />
+                </ResizablePanel>
+              </>
+            )}
           </ResizablePanelGroup>
         </main>
       </div>

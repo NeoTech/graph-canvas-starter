@@ -27,13 +27,32 @@ export class ResultNode extends LGraphNode {
     ctx.roundRect(10, 30, this.size[0] - 20, 40, 6);
     ctx.fill();
 
+    // Format the display value with max 3 decimal places
+    let displayText = String(this.displayValue.toFixed(3));
+    
+    // Remove trailing zeros after decimal point
+    if (displayText.includes('.')) {
+      displayText = displayText.replace(/\.?0+$/, '');
+    }
+
     // Draw result value
     ctx.fillStyle = "#34d399";
     ctx.font = "bold 24px JetBrains Mono, monospace";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
+    
+    // Check if text is too wide and adjust font size if needed
+    const maxWidth = this.size[0] - 30;
+    let fontSize = 24;
+    ctx.font = `bold ${fontSize}px JetBrains Mono, monospace`;
+    
+    while (ctx.measureText(displayText).width > maxWidth && fontSize > 12) {
+      fontSize -= 2;
+      ctx.font = `bold ${fontSize}px JetBrains Mono, monospace`;
+    }
+    
     ctx.fillText(
-      String(this.displayValue.toFixed(2)),
+      displayText,
       this.size[0] * 0.5,
       50
     );

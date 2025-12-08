@@ -1,4 +1,5 @@
 import { LGraphNode } from "litegraph.js";
+import { formatNumber } from "../utils/numberFormat";
 
 export class DivideNode extends LGraphNode {
   static title = "Divide";
@@ -29,7 +30,7 @@ export class DivideNode extends LGraphNode {
     ctx.font = "12px JetBrains Mono, monospace";
     ctx.textAlign = "center";
     ctx.fillText(
-      `${a} ÷ ${b} = ${result.toFixed(2)}`,
+      `${formatNumber(a)} ÷ ${formatNumber(b)} = ${formatNumber(result)}`,
       this.size[0] * 0.5,
       this.size[1] * 0.75
     );

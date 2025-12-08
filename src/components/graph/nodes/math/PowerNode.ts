@@ -1,4 +1,5 @@
 import { LGraphNode } from "litegraph.js";
+import { formatNumber } from "../utils/numberFormat";
 
 export class PowerNode extends LGraphNode {
   static title = "Power";
@@ -29,7 +30,7 @@ export class PowerNode extends LGraphNode {
     ctx.font = "12px JetBrains Mono, monospace";
     ctx.textAlign = "center";
     ctx.fillText(
-      `${base}^${exp} = ${result.toFixed(2)}`,
+      `${formatNumber(base)}^${formatNumber(exp)} = ${formatNumber(result)}`,
       this.size[0] * 0.5,
       this.size[1] * 0.75
     );

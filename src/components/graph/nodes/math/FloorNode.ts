@@ -1,4 +1,5 @@
 import { LGraphNode } from "litegraph.js";
+import { formatNumber } from "../utils/numberFormat";
 
 export class FloorNode extends LGraphNode {
   static title = "Floor";
@@ -26,7 +27,7 @@ export class FloorNode extends LGraphNode {
     ctx.font = "12px JetBrains Mono, monospace";
     ctx.textAlign = "center";
     ctx.fillText(
-      `⌊${value}⌋ = ${result}`,
+      `⌊${formatNumber(value)}⌋ = ${formatNumber(result)}`,
       this.size[0] * 0.5,
       this.size[1] * 0.75
     );

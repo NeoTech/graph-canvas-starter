@@ -1,4 +1,5 @@
 import { LGraphNode } from "litegraph.js";
+import { formatNumber } from "../utils/numberFormat";
 
 export class MinNode extends LGraphNode {
   static title = "Min";
@@ -29,7 +30,7 @@ export class MinNode extends LGraphNode {
     ctx.font = "12px JetBrains Mono, monospace";
     ctx.textAlign = "center";
     ctx.fillText(
-      `min(${a}, ${b}) = ${result}`,
+      `min(${formatNumber(a)}, ${formatNumber(b)}) = ${formatNumber(result)}`,
       this.size[0] * 0.5,
       this.size[1] * 0.75
     );

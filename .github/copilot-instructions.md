@@ -21,27 +21,42 @@ A computational visualization system built with React + TypeScript + Vite that u
 - **ViewBox Strategy**: Calculated from `renderDimensions` with scale/pan transforms
 - **SVG Rendering**: React JSX for static elements (defs, grid, bg-rect), DOM manipulation for shapes
 
-## Critical Data Flow: Event-Driven Visualization
+## Critical Data Flow: SVG Group-Based Visualization System
 
+**MAJOR REFACTOR (Dec 2024)**: System now uses **SVG groups with transforms** instead of coordinate recalculation.
+
+### Coordinate System Hierarchy (CRITICAL)
+
+```
+Level 1: Shape Nodes (Local Coordinates)
+  ↓ Output at (0, 0) by default
+Level 2: Array Nodes (Local Group Positioning)  
+  ↓ Create SVG <g> with translate(), default center (0, 0)
+Level 3: Compose Nodes (Global Canvas Positioning)
+  ↓ Wrap in parent <g>, default center (renderWidth/2, renderHeight/2)
+Level 4: Render Output (Emit to Canvas)
+  ↓ Pass complete group structure to visualization
+```
+
+### ShapeData Interface (Updated)
 ```typescript
-// Pattern used throughout src/components/graph/nodes/index.ts
-function emitVisualization(data: any) {
-  visualizationCallbacks.forEach(cb => cb(data));
-}
-
-// Nodes output shapes as ShapeData objects:
 interface ShapeData {
-  type: string;      // "circle", "rectangle", "polygon", etc.
-  data: any;         // Shape-specific properties
-  zIndex?: number;   // Rendering order (lower = back, higher = front)
+  type: string;           // "circle", "rectangle", "polygon", "group"
+  data?: any;            // Shape-specific properties (optional for groups)
+  zIndex?: number;       // Rendering order for shapes
+  // SVG Group Properties
+  isGroup?: boolean;     // True for group containers
+  children?: ShapeData[]; // Nested shapes/groups
+  transform?: string;    // SVG transform attribute (e.g., "translate(100, 200)")
 }
 ```
 
 **Key Rules**:
-1. Nodes never render directly - they emit `ShapeData` objects
-2. Render Output node receives shapes, calls `emitVisualization()` with canvas dimensions
-3. Index.tsx subscribes via `onVisualizationUpdate()`, updates React state
-4. VisualizationCanvas.tsx renders shapes via `renderVisualization()` (DOM manipulation)
+1. **Shapes** output at local (0,0), never aware of canvas dimensions
+2. **Arrays** wrap shapes in groups with `translate()` transforms, default to (0,0)
+3. **Compose** wraps groups in parent groups, defaults to canvas center for global positioning
+4. **RenderOutput** passes complete group hierarchy including `isGroup`, `children`, `transform`
+5. **VisualizationCanvas** renders nested `<g>` elements, transforms cascade naturally via SVG
 
 ## Node Development Patterns
 
@@ -87,7 +102,7 @@ src/components/graph/nodes/
     └── RenderOutputNode.ts    # SVG canvas output
 ```
 
-### Creating Custom Nodes (Individual Files)
+### Creating Shape Nodes (Local Coordinates)
 ```typescript
 class MyShapeNode extends LGraphNode {
   static title = "My Shape";
@@ -95,19 +110,19 @@ class MyShapeNode extends LGraphNode {
 
   constructor() {
     super("My Shape");
-    // Inputs: Allow dynamic values
+    // Inputs: Allow local positioning relative to parent group
     this.addInput("X", "number");
     this.addInput("Y", "number");
     
     // Outputs: Pass data to other nodes
     this.addOutput("Shape", "shape");
     
-    // Properties: Store default values
-    this.addProperty("x", 960, "number");  // Default to HD center
-    this.addProperty("y", 540, "number");
+    // Properties: Store default values (local coordinates)
+    this.addProperty("x", 0, "number");  // Local (0,0) by default
+    this.addProperty("y", 0, "number");
     
     // Widgets: UI controls (update properties)
-    this.addWidget("number", "X", 960, (v: number) => {
+    this.addWidget("number", "X", 0, (v: number) => {
       this.properties.x = v;
     });
     
@@ -118,9 +133,12 @@ class MyShapeNode extends LGraphNode {
 
   onExecute() {
     // Priority: Input > Property
+    // CRITICAL: Use local coordinates (0,0) by default
+    // DO NOT read renderWidth/renderHeight - shapes are canvas-agnostic
     const x = this.getInputData(0) ?? this.properties.x;
+    const y = this.getInputData(1) ?? this.properties.y;
     
-    // Output ShapeData, never render directly
+    // Output ShapeData with local coordinates
     this.setOutputData(0, {
       type: "myshape",
       data: { x, y, /* ... */ },
@@ -130,28 +148,154 @@ class MyShapeNode extends LGraphNode {
 }
 ```
 
-### Pattern Nodes (Grid/Polar/Circular Array)
-**Critical**: These nodes MUST use render dimensions for centering:
+### Array Nodes (SVG Group Positioning)
+**Critical**: Array nodes create SVG groups with transforms, use local (0,0) by default:
 ```typescript
 onExecute() {
-  // Read from graph (set by Render Output node)
+  const input = this.getInputData(0);
+  if (!input) return;
+  
+  // Normalize input to array
+  const inputShapes: ShapeData[] = Array.isArray(input) ? input : [input];
+  
+  const xInput = this.getInputData(3); // Center X input
+  const yInput = this.getInputData(4); // Center Y input
+  
+  // CRITICAL: Default to local (0,0), NOT canvas center
+  // Only ComposeShapes should default to canvas center
+  const cx = xInput !== undefined && xInput !== null ? xInput : 0;
+  const cy = yInput !== undefined && yInput !== null ? yInput : 0;
+  
+  const groups: ShapeData[] = [];
+  
+  for (let i = 0; i < count; i++) {
+    // Calculate position offset for this copy
+    const offsetX = /* ...array-specific calculation... */;
+    const offsetY = /* ...array-specific calculation... */;
+    
+    // Create SVG group with transform
+    // IMPORTANT: Clone inputShapes to avoid reference sharing
+    const group: ShapeData = {
+      type: "group",
+      isGroup: true,
+      children: JSON.parse(JSON.stringify(inputShapes)), // Deep clone
+      transform: `translate(${cx + offsetX}, ${cy + offsetY})`,
+      zIndex: 0
+    };
+    
+    groups.push(group);
+  }
+  
+  this.setOutputData(0, groups);
+}
+```
+
+### Compose Nodes (Global Canvas Positioning)
+**Critical**: Compose nodes provide global positioning, wrap inputs in parent groups:
+```typescript
+onExecute() {
+  const shapeA = this.getInputData(0);
+  const shapeB = this.getInputData(1);
+  
+  // Get render canvas dimensions for default center
   const renderWidth = (this.graph as any)?.renderWidth || 1920;
   const renderHeight = (this.graph as any)?.renderHeight || 1080;
   
-  // Center calculations relative to render canvas, NOT viewport
-  const centerX = renderWidth / 2;
-  const centerY = renderHeight / 2;
+  const composeXInput = this.getInputData(6);
+  const composeYInput = this.getInputData(7);
+  
+  // CRITICAL: Default to canvas center for global positioning
+  // Only if Compose X/Y inputs are NOT connected
+  const hasComposeInput = composeXInput !== undefined && composeXInput !== null && 
+                         composeYInput !== undefined && composeYInput !== null;
+  
+  const composeX = hasComposeInput ? composeXInput : renderWidth / 2;
+  const composeY = hasComposeInput ? composeYInput : renderHeight / 2;
+  
+  const composed: ShapeData[] = [];
+  
+  // Wrap inputs (shapes OR groups from arrays) in parent group
+  if (shapeA) {
+    const shapesA = Array.isArray(shapeA) ? shapeA : [shapeA];
+    const groupA: ShapeData = {
+      type: "group",
+      isGroup: true,
+      children: shapesA, // Can be shapes OR groups - nesting works!
+      transform: `translate(${composeX + aX}, ${composeY + aY})`,
+      zIndex: 0
+    };
+    composed.push(groupA);
+  }
+  
+  this.setOutputData(0, composed);
 }
 ```
 
 ### Render Output Node (Entry Point)
 - **Must exist** in every graph to see output
 - Sets `graph.renderWidth/renderHeight` in constructor, widgets, `onAdded()`, AND `onExecute()`
-- Clears visualizations before execution via `clearVisualizations()`
-- Sorts shapes by zIndex before emitting
-- Passes canvas dimensions with every visualization event
+- **CRITICAL**: Must pass complete shape objects including group properties:
+```typescript
+sortedShapes.forEach((shape: ShapeData, index: number) => {
+  emitVisualization({
+    type: shape.type,
+    data: shape.data,
+    // MUST include group properties for SVG group rendering
+    isGroup: shape.isGroup,
+    children: shape.children,
+    transform: shape.transform,
+    timestamp: Date.now() + index,
+    canvasWidth: this.properties.width,
+    canvasHeight: this.properties.height,
+    backgroundColor: this.properties.backgroundColor,
+  });
+});
+```
 
 ## SVG Rendering System
+
+### Group Rendering (CRITICAL)
+VisualizationCanvas.tsx now renders SVG groups with nested transforms:
+```typescript
+const renderGroup = (svg: SVGSVGElement, groupData: any) => {
+  const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  
+  // Apply transform if provided
+  if (groupData.transform) {
+    group.setAttribute("transform", groupData.transform);
+  }
+  
+  // Render children shapes within the group
+  if (groupData.children && Array.isArray(groupData.children)) {
+    groupData.children.forEach((child: any) => {
+      renderShapeInGroup(group, child);
+    });
+  }
+  
+  appendShape(svg, group);
+};
+
+const renderShapeInGroup = (group: SVGGElement, shape: any) => {
+  // If the shape is itself a group, recursively handle it
+  if (shape.isGroup || shape.type === "group") {
+    const nestedGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    if (shape.transform) {
+      nestedGroup.setAttribute("transform", shape.transform);
+    }
+    if (shape.children) {
+      shape.children.forEach((child: any) => {
+        renderShapeInGroup(nestedGroup, child);
+      });
+    }
+    group.appendChild(nestedGroup);
+    return;
+  }
+  
+  // Render individual shape element (circle, rect, polygon, etc.)
+  const element = createShapeElement(shape);
+  group.appendChild(element);
+};
+```
 
 ### Shape Z-Index (Stacking Order)
 Background rect (`id="bg-rect"`) MUST render first, then shapes append via `appendShape()`:
@@ -175,6 +319,59 @@ const appendShape = (svg: SVGSVGElement, element: SVGElement) => {
 - **Pan**: Click-drag with cursor feedback (grab/grabbing)
 - **Fit View**: Calculates scale to fit render dimensions in viewport with 50px padding
 - **ViewBox Math**: `offsetX = (width - scaledWidth) / 2 - pan.x / scale`
+
+### SVG Export System
+**Location**: `src/components/graph/VisualizationCanvas.tsx` - Download button in Header component
+
+**Functionality**:
+- Serializes complete SVG canvas including shapes, groups, transforms, and styling
+- Embeds LiteGraph node graph as JSON metadata in `<metadata>` tag for restore capability
+- Generates downloadable `.svg` file with timestamp
+
+**Metadata Format** (IMPORTANT):
+```typescript
+// CORRECT: Compact JSON on single line (recommended)
+const metadata = `<metadata id="graph-data">${JSON.stringify(graphData)}</metadata>`;
+
+// INCORRECT: Prettified/formatted JSON (avoid this)
+const metadata = `<metadata id="graph-data">${JSON.stringify(graphData, null, 2)}</metadata>`;
+```
+
+**Rationale**: Compact single-line JSON keeps SVG file size smaller and prevents unnecessary whitespace in exported files. Metadata is machine-readable, not intended for human editing. For debugging graph structure, use browser DevTools or dedicated JSON viewers.
+
+**Implementation Pattern**:
+```typescript
+// In VisualizationCanvas.tsx download handler
+const handleDownloadSVG = () => {
+  const svgElement = svgRef.current;
+  if (!svgElement) return;
+  
+  // Clone SVG to avoid modifying rendered version
+  const svgClone = svgElement.cloneNode(true) as SVGSVGElement;
+  
+  // Add compact graph metadata (no formatting)
+  const graphData = graph?.serialize(); // LiteGraph JSON
+  const metadata = document.createElementNS("http://www.w3.org/2000/svg", "metadata");
+  metadata.setAttribute("id", "graph-data");
+  metadata.textContent = JSON.stringify(graphData); // Single line, no spaces
+  svgClone.insertBefore(metadata, svgClone.firstChild);
+  
+  // Serialize and download
+  const svgString = new XMLSerializer().serializeToString(svgClone);
+  const blob = new Blob([svgString], { type: "image/svg+xml" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `visualization-${Date.now()}.svg`;
+  link.click();
+  URL.revokeObjectURL(url);
+};
+```
+
+**Future Import System** (see roadmap):
+- Parse `<metadata id="graph-data">` tag from loaded SVG
+- Deserialize JSON to restore LGraph state
+- Reconstruct all nodes, connections, and property values
 
 ## Developer Workflows
 
@@ -209,11 +406,39 @@ npm run dev  # Vite dev server on localhost:8080
 
 ## Common Pitfalls
 
-1. **Viewport vs Render Dimensions**: Pattern nodes must use `graph.renderWidth/renderHeight`, NOT canvas viewport size
-2. **Widget Updates**: Render Output widgets update graph dimensions immediately, not just in `onExecute()`
-3. **Background Disappearing**: Ensure `id="bg-rect"` on background rect and preserve it during SVG cleanup
-4. **zIndex Ignored**: Render Output sorts by zIndex - shapes must have this property
-5. **Context Menus**: Disabled via overriding `getCanvasMenuOptions()`, `getNodeMenuOptions()`, `getGroupMenuOptions()` in GraphEditor
+1. **Coordinate System Hierarchy** (CRITICAL - Dec 2024 Refactor):
+   - **Shapes** MUST output at local (0,0) - never read renderWidth/renderHeight
+   - **Arrays** MUST default to (0,0) local coordinates - only use canvas center if explicitly needed
+   - **Compose** MUST default to canvas center (renderWidth/2, renderHeight/2) for global positioning
+   - **Pitfall**: If arrays default to canvas center, shapes will "stack" instead of positioning locally
+   - **Fix**: Arrays use `cx = xInput ?? 0`, Compose uses `composeX = hasInput ? input : renderWidth/2`
+
+2. **Group Reference Sharing** (CRITICAL):
+   - Array nodes must **deep clone** input shapes: `JSON.parse(JSON.stringify(inputShapes))`
+   - **Pitfall**: Sharing same array reference causes one shape to stay stationary
+   - **Fix**: Each group gets its own independent copy of children
+
+3. **Group Properties in RenderOutput**:
+   - RenderOutputNode must pass `isGroup`, `children`, `transform` to emitVisualization()
+   - **Pitfall**: Groups created but not rendering = missing group properties in emission
+   - **Fix**: Include all group properties when calling emitVisualization()
+
+4. **Widget Updates**: Render Output widgets update graph dimensions immediately, not just in `onExecute()`
+
+5. **Background Disappearing**: Ensure `id="bg-rect"` on background rect and preserve it during SVG cleanup
+
+6. **zIndex Ignored**: Render Output sorts by zIndex - shapes must have this property
+
+7. **Context Menus**: Disabled via overriding `getCanvasMenuOptions()`, `getNodeMenuOptions()`, `getGroupMenuOptions()` in GraphEditor
+
+8. **ResizablePanel Behavior** (Index.tsx split-view layout):
+   - **CRITICAL**: With `direction="vertical"`, the **first panel in DOM** grows when you drag the handle **down**
+   - **DOM Order Controls Resize**: Place the panel you want to grow on drag-down FIRST in the DOM
+   - **Visual Layout**: Flexbox naturally stacks panels in DOM order (first = top, second = bottom)
+   - **Current Setup**: Graph Editor first in DOM (bottom visually), Visualization Canvas second (top visually)
+   - This makes dragging down expand the Graph Editor (intuitive behavior)
+   - **DO NOT** use CSS `order`, `flex-direction: column-reverse`, or swap DOM order to "fix" resize - it breaks the natural behavior
+   - If resize feels inverted, the panels are in the wrong DOM order, not a CSS issue
 
 ## Technology Stack
 - **React 18** + TypeScript + Vite (SWC)
@@ -277,6 +502,10 @@ npm run dev  # Vite dev server on localhost:8080
    - Playback controls (play/pause/speed)
    - Timeline visualization
    - Live SVG updates during animation
+
+8. **Docker Container build**
+   - Create a docker build script for this application.
+   - Create a docker-compose run script for the container.
 
 ### Implementation Notes for Future Developers
 - **Export**: SVG serialization from `VisualizationCanvas.tsx` svgRef, embed graph JSON in `<metadata>` tags

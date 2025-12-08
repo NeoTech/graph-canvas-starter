@@ -68,7 +68,7 @@ const nodeCategories = [
 
 export const Sidebar = ({ onAddNode }: SidebarProps) => {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
-    new Set(nodeCategories.map(cat => cat.name)) // All expanded by default
+    new Set() // All collapsed by default
   );
 
   const toggleCategory = (categoryName: string) => {

@@ -1,4 +1,5 @@
 import { LGraphNode } from "litegraph.js";
+import { formatNumber } from "../utils/numberFormat";
 
 export class CosineNode extends LGraphNode {
   static title = "Cosine";
@@ -26,7 +27,7 @@ export class CosineNode extends LGraphNode {
     ctx.font = "12px JetBrains Mono, monospace";
     ctx.textAlign = "center";
     ctx.fillText(
-      `cos(${angle}°) = ${result.toFixed(3)}`,
+      `cos(${formatNumber(angle)}°) = ${formatNumber(result)}`,
       this.size[0] * 0.5,
       this.size[1] * 0.75
     );

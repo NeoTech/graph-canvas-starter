@@ -1,4 +1,5 @@
 import { LGraphNode } from "litegraph.js";
+import { formatNumber } from "../utils/numberFormat";
 
 export class SubtractNode extends LGraphNode {
   static title = "Subtract";
@@ -28,7 +29,7 @@ export class SubtractNode extends LGraphNode {
     ctx.font = "12px JetBrains Mono, monospace";
     ctx.textAlign = "center";
     ctx.fillText(
-      `${a} - ${b} = ${a - b}`,
+      `${formatNumber(a)} - ${formatNumber(b)} = ${formatNumber(a - b)}`,
       this.size[0] * 0.5,
       this.size[1] * 0.75
     );

@@ -79,6 +79,10 @@ export class RenderOutputNode extends LGraphNode {
       emitVisualization({
         type: shape.type,
         data: shape.data,
+        // Include group properties for SVG group rendering
+        isGroup: shape.isGroup,
+        children: shape.children,
+        transform: shape.transform,
         timestamp: Date.now() + index, // Add index to ensure unique timestamps
         canvasWidth: this.properties.width,
         canvasHeight: this.properties.height,
