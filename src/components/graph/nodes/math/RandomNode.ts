@@ -12,7 +12,13 @@ export class RandomNode extends LGraphNode {
     this.addOutput("Value", "number");
     this.addProperty("min", 0, "number");
     this.addProperty("max", 1, "number");
-    this.size = [180, 70];
+    this.addWidget("number", "Min", 0, (v: number) => {
+      this.properties.min = v;
+    });
+    this.addWidget("number", "Max", 1, (v: number) => {
+      this.properties.max = v;
+    });
+    this.size = [180, 120];
     this.color = "#4c1d95";
     this.bgcolor = "#1e1b4b";
   }

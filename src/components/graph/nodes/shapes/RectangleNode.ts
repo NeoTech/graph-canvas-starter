@@ -13,14 +13,29 @@ export class RectangleVisualizerNode extends LGraphNode {
     this.addInput("Height", "number");
     this.addInput("Z-Index", "number");
     this.addOutput("Shape", "shape");
-    this.addProperty("x", 960, "number");
-    this.addProperty("y", 540, "number");
+    this.addProperty("x", 0, "number");
+    this.addProperty("y", 0, "number");
     this.addProperty("width", 100, "number");
     this.addProperty("height", 100, "number");
     this.addProperty("zIndex", 0, "number");
     this.addProperty("fill", "#a855f7", "string");
     this.addProperty("stroke", "#7c3aed", "string");
-    this.size = [200, 160];
+    this.addWidget("number", "X", 0, (v: number) => {
+      this.properties.x = v;
+    });
+    this.addWidget("number", "Y", 0, (v: number) => {
+      this.properties.y = v;
+    });
+    this.addWidget("number", "Width", 100, (v: number) => {
+      this.properties.width = v;
+    });
+    this.addWidget("number", "Height", 100, (v: number) => {
+      this.properties.height = v;
+    });
+    this.addWidget("number", "Z-Index", 0, (v: number) => {
+      this.properties.zIndex = v;
+    });
+    this.size = [200, 230];
     this.color = "#6d28d9";
     this.bgcolor = "#4c1d95";
   }

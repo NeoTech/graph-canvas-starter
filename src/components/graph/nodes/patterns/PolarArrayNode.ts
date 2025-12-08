@@ -13,16 +13,28 @@ export class PolarArrayNode extends LGraphNode {
     this.addInput("Center X", "number");
     this.addInput("Center Y", "number");
     this.addOutput("Shapes", "shape_array");
-    this.addProperty("centerX", 400, "number");
-    this.addProperty("centerY", 300, "number");
+    this.addProperty("centerX", 0, "number");
+    this.addProperty("centerY", 0, "number");
     this.addProperty("count", 8, "number");
     this.addProperty("radius", 120, "number");
     this.addProperty("rotation", 0, "number");
     this.addProperty("treatAsGroup", true, "boolean");
+    this.addWidget("number", "Center X", 0, (v: number) => {
+      this.properties.centerX = v;
+    });
+    this.addWidget("number", "Center Y", 0, (v: number) => {
+      this.properties.centerY = v;
+    });
+    this.addWidget("number", "Count", 8, (v: number) => {
+      this.properties.count = v;
+    });
+    this.addWidget("number", "Radius", 120, (v: number) => {
+      this.properties.radius = v;
+    });
     this.addWidget("toggle", "Treat As Group", this.properties.treatAsGroup, (v: any) => {
       this.properties.treatAsGroup = v;
     });
-    this.size = [220, 180];
+    this.size = [220, 250];
     this.color = "#c026d3";
     this.bgcolor = "#86198f";
   }
@@ -56,12 +68,11 @@ export class PolarArrayNode extends LGraphNode {
     
     const count = Math.max(1, Math.floor(Math.abs(countInput !== undefined && countInput !== null ? countInput : this.properties.count)));
     const radius = Math.abs(radiusInput !== undefined && radiusInput !== null ? radiusInput : this.properties.radius);
-    // Get render canvas center from Render Output node
-    const renderWidth = (this.graph as any)?.renderWidth || 1920;
-    const renderHeight = (this.graph as any)?.renderHeight || 1080;
-    // Use render canvas center by default, or input value if provided
-    const cx = xInput !== undefined && xInput !== null ? xInput : renderWidth / 2;
-    const cy = yInput !== undefined && yInput !== null ? yInput : renderHeight / 2;
+    
+    // CRITICAL: Default to local (0,0), NOT canvas center
+    // Only ComposeShapes should default to canvas center
+    const cx = xInput !== undefined && xInput !== null ? xInput : this.properties.centerX;
+    const cy = yInput !== undefined && yInput !== null ? yInput : this.properties.centerY;
     const rotation = this.properties.rotation * (Math.PI / 180);
 
     const shapes: ShapeData[] = [];

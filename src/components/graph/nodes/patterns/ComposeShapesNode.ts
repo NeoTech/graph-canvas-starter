@@ -18,11 +18,29 @@ export class ComposeShapesNode extends LGraphNode {
     this.addOutput("Composed", "shape_array");
     this.addProperty("aX", 0, "number");
     this.addProperty("aY", 0, "number");
-    this.addProperty("bX", 100, "number");
+    this.addProperty("bX", 0, "number");
     this.addProperty("bY", 0, "number");
     this.addProperty("composeX", 960, "number");
     this.addProperty("composeY", 540, "number");
-    this.size = [220, 200];
+    this.addWidget("number", "A X", this.properties.aX, (v: number) => {
+      this.properties.aX = v;
+    });
+    this.addWidget("number", "A Y", this.properties.aY, (v: number) => {
+      this.properties.aY = v;
+    });
+    this.addWidget("number", "B X", this.properties.bX, (v: number) => {
+      this.properties.bX = v;
+    });
+    this.addWidget("number", "B Y", this.properties.bY, (v: number) => {
+      this.properties.bY = v;
+    });
+    this.addWidget("number", "Compose X", this.properties.composeX, (v: number) => {
+      this.properties.composeX = v;
+    });
+    this.addWidget("number", "Compose Y", this.properties.composeY, (v: number) => {
+      this.properties.composeY = v;
+    });
+    this.size = [220, 320];
     this.color = "#d946ef";
     this.bgcolor = "#a21caf";
   }
@@ -54,15 +72,12 @@ export class ComposeShapesNode extends LGraphNode {
     const bY = bYInput !== undefined && bYInput !== null ? bYInput : this.properties.bY;
     
     // Compose X/Y is the base position for the composition
-    // If NOT explicitly connected, default to canvas center for global positioning
-    // If connected (even to 0), use that value for explicit positioning
-    const hasComposeInput = composeXInput !== undefined && composeXInput !== null && 
-                           composeYInput !== undefined && composeYInput !== null;
-    
-    // When compose inputs are connected, use them (allows explicit 0,0 positioning)
-    // When not connected, default to canvas center (for standalone rendering)
-    const composeX = hasComposeInput ? composeXInput : renderWidth / 2;
-    const composeY = hasComposeInput ? composeYInput : renderHeight / 2;
+    // Priority: Input > Property > Canvas Center
+    // If inputs are connected, use them (allows explicit 0,0 positioning)
+    // If not connected, use property values (user-editable via widgets)
+    // Only default to canvas center if property hasn't been changed from defaults
+    const composeX = composeXInput !== undefined && composeXInput !== null ? composeXInput : this.properties.composeX;
+    const composeY = composeYInput !== undefined && composeYInput !== null ? composeYInput : this.properties.composeY;
 
     const composed: ShapeData[] = [];
 

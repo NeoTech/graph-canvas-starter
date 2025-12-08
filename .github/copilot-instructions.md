@@ -122,8 +122,12 @@ class MyShapeNode extends LGraphNode {
     this.addProperty("y", 0, "number");
     
     // Widgets: UI controls (update properties)
+    // CRITICAL: Every numeric property MUST have a widget
     this.addWidget("number", "X", 0, (v: number) => {
       this.properties.x = v;
+    });
+    this.addWidget("number", "Y", 0, (v: number) => {
+      this.properties.y = v;
     });
     
     // Styling (color codes indicate node type)
@@ -148,6 +152,17 @@ class MyShapeNode extends LGraphNode {
 }
 ```
 
+**Widget Pattern (CRITICAL)**:
+Each numeric parameter MUST have three components:
+1. **Property** - Stores the default value
+2. **Widget** - UI control to edit the property directly on the node
+3. **Input** - Graph connection that overrides the property when connected
+
+This pattern allows users to:
+- Type values directly into widgets for quick edits
+- OR connect math nodes for dynamic/chained values
+- Input always takes priority when connected
+
 ### Array Nodes (SVG Group Positioning)
 **Critical**: Array nodes create SVG groups with transforms, use local (0,0) by default:
 ```typescript
@@ -163,8 +178,8 @@ onExecute() {
   
   // CRITICAL: Default to local (0,0), NOT canvas center
   // Only ComposeShapes should default to canvas center
-  const cx = xInput !== undefined && xInput !== null ? xInput : 0;
-  const cy = yInput !== undefined && yInput !== null ? yInput : 0;
+  const cx = xInput !== undefined && xInput !== null ? xInput : this.properties.centerX;
+  const cy = yInput !== undefined && yInput !== null ? yInput : this.properties.centerY;
   
   const groups: ShapeData[] = [];
   
@@ -228,6 +243,44 @@ onExecute() {
   }
   
   this.setOutputData(0, composed);
+}
+```
+
+### Math Nodes (Value Generators vs Operations)
+**Two categories of math nodes:**
+
+1. **Value Generators** (have widgets):
+   - NumberNode - outputs a constant value
+   - RandomNode - generates random numbers with min/max range
+   - These nodes provide configurable values and MUST have widgets for their parameters
+
+2. **Operations** (no widgets):
+   - Add, Subtract, Multiply, Divide, Modulo, Power
+   - Min, Max, Abs, Floor, Ceil, Round
+   - Sine, Cosine
+   - These nodes only perform calculations on inputs - no widgets needed
+   - Users connect inputs from other nodes to perform operations
+
+**Example - NumberNode (correct pattern with widget)**:
+```typescript
+constructor() {
+  super("Number");
+  this.addOutput("value", "number");
+  this.addProperty("value", 1, "number");
+  this.addWidget("number", "value", 1, (v: number) => {
+    this.properties.value = v;
+  });
+}
+```
+
+**Example - AddNode (correct pattern without widgets)**:
+```typescript
+constructor() {
+  super("Add");
+  this.addInput("A", "number");
+  this.addInput("B", "number");
+  this.addOutput("Result", "number");
+  // No properties or widgets - pure operation node
 }
 ```
 
@@ -468,11 +521,6 @@ npm run dev  # Vite dev server on localhost:8080
 ## Future Extensions & Roadmap
 
 ### Planned Features (Not Yet Implemented)
-1. **Export Capabilities**
-   - Save visualization to SVG file format
-   - Export with embedded node graph metadata or separate JSON
-   - Laser cutter export with dimension scaling (e.g., 1:10 ratio for mm conversion)
-
 2. **Import/Load System**
    - Read node tree from saved files (SVG metadata or JSON)
    - Restore complete graph state including connections

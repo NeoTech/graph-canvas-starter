@@ -12,13 +12,25 @@ export class CircleVisualizerNode extends LGraphNode {
     this.addInput("Radius", "number");
     this.addInput("Z-Index", "number");
     this.addOutput("Shape", "shape");
-    this.addProperty("x", 960, "number");
-    this.addProperty("y", 540, "number");
+    this.addProperty("x", 0, "number");
+    this.addProperty("y", 0, "number");
     this.addProperty("radius", 50, "number");
     this.addProperty("zIndex", 0, "number");
     this.addProperty("fill", "#22d3ee", "string");
     this.addProperty("stroke", "#0891b2", "string");
-    this.size = [200, 140];
+    this.addWidget("number", "X", 0, (v: number) => {
+      this.properties.x = v;
+    });
+    this.addWidget("number", "Y", 0, (v: number) => {
+      this.properties.y = v;
+    });
+    this.addWidget("number", "Radius", 50, (v: number) => {
+      this.properties.radius = v;
+    });
+    this.addWidget("number", "Z-Index", 0, (v: number) => {
+      this.properties.zIndex = v;
+    });
+    this.size = [200, 200];
     this.color = "#0e7490";
     this.bgcolor = "#164e63";
   }

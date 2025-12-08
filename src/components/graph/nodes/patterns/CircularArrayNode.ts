@@ -13,13 +13,25 @@ export class CircularArrayNode extends LGraphNode {
     this.addInput("Center X", "number");
     this.addInput("Center Y", "number");
     this.addOutput("Shapes", "shape_array");
-    this.addProperty("centerX", 400, "number");
-    this.addProperty("centerY", 300, "number");
+    this.addProperty("centerX", 0, "number");
+    this.addProperty("centerY", 0, "number");
     this.addProperty("count", 12, "number");
     this.addProperty("radius", 100, "number");
     this.addProperty("startAngle", 0, "number");
     this.addProperty("endAngle", 360, "number");
     this.addProperty("treatAsGroup", true, "boolean");
+    this.addWidget("number", "Center X", 0, (v: number) => {
+      this.properties.centerX = v;
+    });
+    this.addWidget("number", "Center Y", 0, (v: number) => {
+      this.properties.centerY = v;
+    });
+    this.addWidget("number", "Count", 12, (v: number) => {
+      this.properties.count = v;
+    });
+    this.addWidget("number", "Radius", 100, (v: number) => {
+      this.properties.radius = v;
+    });
     this.addWidget("number", "Start Angle", this.properties.startAngle, (v: any) => {
       this.properties.startAngle = v;
     }, { min: 0, max: 360, step: 1 });
@@ -29,7 +41,7 @@ export class CircularArrayNode extends LGraphNode {
     this.addWidget("toggle", "Treat As Group", this.properties.treatAsGroup, (v: any) => {
       this.properties.treatAsGroup = v;
     });
-    this.size = [220, 230];
+    this.size = [220, 330];
     this.color = "#0891b2";
     this.bgcolor = "#164e63";
   }
@@ -52,11 +64,10 @@ export class CircularArrayNode extends LGraphNode {
     const count = Math.max(1, Math.floor(Math.abs(countInput !== undefined && countInput !== null ? countInput : this.properties.count)));
     const radius = radiusInput !== undefined && radiusInput !== null ? Math.abs(radiusInput) : this.properties.radius;
     
-    // Center X/Y inputs position the entire circular array group
-    // Default to local (0,0) - array positions relative to parent group
-    // Only use canvas center if explicitly needed for standalone rendering
-    const cx = xInput !== undefined && xInput !== null ? xInput : 0;
-    const cy = yInput !== undefined && yInput !== null ? yInput : 0;
+    // CRITICAL: Default to local (0,0), NOT canvas center
+    // Only ComposeShapes should default to canvas center
+    const cx = xInput !== undefined && xInput !== null ? xInput : this.properties.centerX;
+    const cy = yInput !== undefined && yInput !== null ? yInput : this.properties.centerY;
     
     const startAngle = this.properties.startAngle * (Math.PI / 180);
     const endAngle = this.properties.endAngle * (Math.PI / 180);

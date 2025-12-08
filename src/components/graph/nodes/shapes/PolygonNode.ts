@@ -13,14 +13,29 @@ export class PolygonVisualizerNode extends LGraphNode {
     this.addInput("Radius", "number");
     this.addInput("Z-Index", "number");
     this.addOutput("Shape", "shape");
-    this.addProperty("centerX", 960, "number");
-    this.addProperty("centerY", 540, "number");
+    this.addProperty("centerX", 0, "number");
+    this.addProperty("centerY", 0, "number");
     this.addProperty("sides", 6, "number");
     this.addProperty("radius", 80, "number");
     this.addProperty("zIndex", 0, "number");
     this.addProperty("fill", "#34d399", "string");
     this.addProperty("stroke", "#059669", "string");
-    this.size = [200, 150];
+    this.addWidget("number", "X", 0, (v: number) => {
+      this.properties.centerX = v;
+    });
+    this.addWidget("number", "Y", 0, (v: number) => {
+      this.properties.centerY = v;
+    });
+    this.addWidget("number", "Sides", 6, (v: number) => {
+      this.properties.sides = v;
+    });
+    this.addWidget("number", "Radius", 80, (v: number) => {
+      this.properties.radius = v;
+    });
+    this.addWidget("number", "Z-Index", 0, (v: number) => {
+      this.properties.zIndex = v;
+    });
+    this.size = [200, 230];
     this.color = "#047857";
     this.bgcolor = "#064e3b";
   }
